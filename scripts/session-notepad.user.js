@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Claude Code Web — Notepad por sessão
 // @namespace    bruno.uptide
-// @version      2.5
+// @version      2.6
 // @description  Painel lateral de notas por sessão no Claude Code Web (empurra o conteúdo, estilo Diff). Atalho Ctrl+Shift+S, redimensionável, links clicáveis. Nota salva por sessionId no localStorage.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
@@ -47,7 +47,7 @@
   const escHtml = s => s.replace(/&/gu, '&amp;').replace(/</gu, '&lt;').replace(/>/gu, '&gt;');
   // newline fica como \n literal (editor usa white-space: pre-wrap) -> round-trip idempotente
   const linkify = t => escHtml(t || '').replace(/(?<url>https?:\/\/[^\s<]+)/gu, '<a href="$<url>" target="_blank" rel="noopener" style="color:' + ACCENT + ';text-decoration:underline">$<url></a>');
-  const getText = () => editor.innerText.replace(/ /gu, ' ');
+  const getText = () => editor.innerText.replace(/\u00a0/gu, ' ');
   const setText = t => { editor.innerHTML = linkify(t); };
 
   function squeeze(on, w) { const m = document.getElementById('dframe-main'); if (m) m.style.right = on ? (w + 'px') : ''; }

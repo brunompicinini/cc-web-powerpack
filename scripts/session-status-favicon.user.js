@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Claude Code Web — Session Status Favicon + Title
 // @namespace    bruno.uptide
-// @version      2.3
+// @version      2.4
 // @description  Favicon = status da sessão (verde=running, amarelo=awaiting input, azul=ready, roxo=merged), recolorindo o ícone real do Claude. Título da aba = nome da sessão.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*

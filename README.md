@@ -60,3 +60,9 @@ O Tampermonkey checa o `@updateURL` periodicamente. Quando o `@version` no repos
 - Mantenha `@downloadURL` / `@updateURL` apontando para a raw da branch `main`.
 - **Suba o `@version`** a cada mudança publicada — é o que dispara o auto‑update.
 - Veja [`CLAUDE.md`](CLAUDE.md) para convenções e detalhes do DOM do Claude Code Web.
+
+---
+
+## Licença
+
+[MIT](LICENSE) © Bruno Picinini
