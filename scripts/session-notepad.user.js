@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Claude Code Web — Notepad por sessão
 // @namespace    bruno.uptide
-// @version      2.7
+// @version      2.8
 // @description  Painel lateral de notas por sessão no Claude Code Web (empurra o conteúdo, estilo Diff). Atalho Ctrl+Shift+S, redimensionável, links clicáveis. Nota salva por sessionId no localStorage.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
@@ -65,7 +65,7 @@
 
     // handle de redimensionar (borda esquerda)
     const handle = document.createElement('div');
-    Object.assign(handle.style, { flex: '0 0 10px', cursor: 'col-resize', display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: '-5px', zIndex: '1' });
+    Object.assign(handle.style, { flex: '0 0 10px', cursor: 'col-resize', display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: '-10px', zIndex: '1' });
     const grip = document.createElement('div');
     Object.assign(grip.style, { width: '4px', height: '42px', borderRadius: '4px', background: 'rgba(255,255,255,0.35)', opacity: '0', transition: 'opacity .15s ease' });
     handle.appendChild(grip);
