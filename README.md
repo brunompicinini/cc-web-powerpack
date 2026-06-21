@@ -11,6 +11,7 @@ Cada script fica em [`scripts/`](scripts/), termina em `.user.js` e instala dire
 | Script | O que faz |
 | --- | --- |
 | [`session-status-favicon.user.js`](scripts/session-status-favicon.user.js) | Recolore o **favicon** da aba conforme o status da sessão aberta — 🟢 running, 🟡 awaiting input, 🔵 ready, 🟣 merged — e troca o **título da aba** pelo nome da sessão. |
+| [`session-notepad.user.js`](scripts/session-notepad.user.js) | **Notepad por sessão**: painel lateral de notas (empurra o conteúdo, estilo Diff). Atalho `Ctrl+Shift+S`, redimensionável, links clicáveis. Salva por `sessionId` no `localStorage`. |
 
 ---
 
@@ -28,11 +29,13 @@ A partir do Chrome 138 a permissão de user scripts foi separada do *Developer M
 
 > Em versões antigas, o equivalente era ligar o *Developer Mode* global. Um aviso de "developer mode required" às vezes aparece bugado — se os scripts já estão rodando, pode ignorar.
 
-### 3. Instalar o script
-Abra a **raw URL** do script (termina em `.user.js`) e o Tampermonkey intercepta com a tela de **Install**:
+### 3. Instalar os scripts
+Abra a **raw URL** de cada script (termina em `.user.js`) e o Tampermonkey intercepta com a tela de **Install**:
 
 - **Session Status Favicon + Title** →
   `https://raw.githubusercontent.com/brunompicinini/cc-web-powerpack/main/scripts/session-status-favicon.user.js`
+- **Session Notepad** →
+  `https://raw.githubusercontent.com/brunompicinini/cc-web-powerpack/main/scripts/session-notepad.user.js`
 
 Clique em **Install**. Pronto.
 

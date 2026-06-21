@@ -15,6 +15,7 @@ Repo público: `brunompicinini/cc-web-powerpack`, branch default `main`.
   `https://raw.githubusercontent.com/brunompicinini/cc-web-powerpack/main/scripts/<arquivo>.user.js`
 - **Toda mudança publicada exige subir o `@version`** — é o gatilho do auto‑update do Tampermonkey.
 - Filename e a parte final das URLs raw têm que bater (senão o auto‑update quebra).
+- Cuidado com caracteres invisíveis usados de propósito nos regex (zero-width `​-‍﻿` no favicon; nbsp ` ` no notepad). Não "limpar" sem querer.
 
 ## scripts/session-status-favicon.user.js
 Recolore o favicon real do Claude conforme o status da sessão aberta e troca o título da aba pelo nome da sessão.
@@ -29,6 +30,14 @@ Fatos do DOM do Claude Code Web (descobertos inspecionando a página) que o scri
 
 Recolorir o favicon: carrega `claude.ai/favicon.ico` (mesma origem → canvas não "tainta"), desenha num canvas e usa `globalCompositeOperation = 'source-in'` pra trocar a cor mantendo a forma. Cada cor é gerada 1x e fica em cache.
 
+## scripts/session-notepad.user.js
+Painel lateral de notas por sessão. Atalho `Ctrl+Shift+S` (ou botão injetado na barra de ações), `Esc` fecha. Redimensionável (largura salva em `localStorage` key `cc-notes:w`, padrão 750px). Nota salva por sessão em `localStorage` key `cc-notes:<sessionId>` (debounce 300ms). Links viram clicáveis (linkify). Editor é `contentEditable=plaintext-only` pra newline sair como `\n` literal.
+
+Fatos do DOM:
+- `sessionId` vem do path: `/session_[A-Za-z0-9]+/`.
+- A barra onde o botão é injetado é achada por `button[aria-label="Share"|"Session actions"|"Diff"]`, subindo pro `span.epitaxy-titlebar-fade` (ou parent).
+- O conteúdo principal que é "empurrado" pelo painel é `#dframe-main` (ajusta `style.right`).
+
 ## Testar/lintar
 - Não é um projeto Node; não há build. Edição manual do `.user.js`.
-- Lint opcional com ESLint (flat config), regras de formatação + `no-undef` com globals de browser. Globals usados: `window, document, location, history, setTimeout, setInterval, MutationObserver, Image, addEventListener, Promise`.
+- Lint opcional com ESLint (flat config), regras de formatação + `no-undef` com globals de browser. Globals usados: `window, document, location, localStorage, history, setTimeout, setInterval, clearTimeout, MutationObserver, Image, addEventListener, Promise`.
