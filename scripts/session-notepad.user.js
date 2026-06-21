@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Claude Code Web — Notepad por sessão
 // @namespace    bruno.uptide
-// @version      2.6
+// @version      2.7
 // @description  Painel lateral de notas por sessão no Claude Code Web (empurra o conteúdo, estilo Diff). Atalho Ctrl+Shift+S, redimensionável, links clicáveis. Nota salva por sessionId no localStorage.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
@@ -67,14 +67,18 @@
     const handle = document.createElement('div');
     Object.assign(handle.style, { flex: '0 0 10px', cursor: 'col-resize', display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: '-5px', zIndex: '1' });
     const grip = document.createElement('div');
-    Object.assign(grip.style, { width: '4px', height: '42px', borderRadius: '4px', background: 'rgba(255,255,255,0.18)' });
+    Object.assign(grip.style, { width: '4px', height: '42px', borderRadius: '4px', background: 'rgba(255,255,255,0.35)', opacity: '0', transition: 'opacity .15s ease' });
     handle.appendChild(grip);
-    handle.addEventListener('mouseenter', () => { grip.style.background = 'rgba(255,255,255,0.35)'; });
-    handle.addEventListener('mouseleave', () => { grip.style.background = 'rgba(255,255,255,0.18)'; });
+    // grip some por padrao; aparece so no hover da borda ou enquanto arrasta
+    let gripHover = false, gripDrag = false;
+    const syncGrip = () => { grip.style.opacity = (gripHover || gripDrag) ? '1' : '0'; };
+    handle.addEventListener('mouseenter', () => { gripHover = true; syncGrip(); });
+    handle.addEventListener('mouseleave', () => { gripHover = false; syncGrip(); });
     handle.addEventListener('mousedown', e => {
       e.preventDefault(); document.body.style.userSelect = 'none';
+      gripDrag = true; syncGrip();
       const move = ev => { const nw = Math.min(maxW(), Math.max(MINW, window.innerWidth - ev.clientX)); drawer.style.width = nw + 'px'; squeeze(true, nw); };
-      const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); document.body.style.userSelect = ''; setW(parseInt(drawer.style.width, 10)); };
+      const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); document.body.style.userSelect = ''; setW(parseInt(drawer.style.width, 10)); gripDrag = false; syncGrip(); };
       document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
     });
 
