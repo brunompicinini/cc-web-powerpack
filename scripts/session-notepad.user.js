@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Claude Code Web — Notepad por sessão
 // @namespace    bruno.uptide
-// @version      2.9
+// @version      2.10
 // @description  Painel lateral de notas por sessão no Claude Code Web (empurra o conteúdo, estilo Diff). Atalho Ctrl+Shift+S, redimensionável, links clicáveis. Nota salva por sessionId no localStorage.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
@@ -49,6 +49,9 @@
   const linkify = t => escHtml(t || '').replace(/(?<url>https?:\/\/[^\s<]+)/gu, '<a href="$<url>" target="_blank" rel="noopener" style="color:' + ACCENT + ';text-decoration:underline">$<url></a>');
   const getText = () => editor.innerText.replace(/\u00a0/gu, ' ');
   const setText = t => { editor.innerHTML = linkify(t); };
+  // abre em aba de FUNDO (nao troca de aba): clique sintetico com modificador num <a>, igual ao cmd/ctrl+click nativo do Chrome.
+  // window.open() sempre traz a aba pra frente -> nao serve. anchor "solto" navega mesmo sem estar no DOM.
+  const openBg = url => { const a = document.createElement('a'); a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true, metaKey: true })); };
 
   function squeeze(on, w) { const m = document.getElementById('dframe-main'); if (m) m.style.right = on ? (w + 'px') : ''; }
 
@@ -107,7 +110,8 @@
     editor.addEventListener('mousedown', e => {
       const a = e.target.closest && e.target.closest('a'); if (!a) return;
       const editing = document.activeElement === editor || editor.contains(document.activeElement);
-      if (e.metaKey || e.ctrlKey || !editing) { e.preventDefault(); window.open(a.href, '_blank', 'noopener'); }
+      if (e.metaKey || e.ctrlKey) { e.preventDefault(); openBg(a.href); }                      // cmd/ctrl+click: aba de fundo, sem trocar
+      else if (!editing) { e.preventDefault(); window.open(a.href, '_blank', 'noopener'); }       // clique normal fora de edicao: traz pra frente
     });
 
     col.appendChild(header); col.appendChild(editor);

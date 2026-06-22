@@ -36,7 +36,7 @@ Fatos do DOM do Claude Code Web (descobertos inspecionando a página) que o scri
 Recolorir o favicon: carrega `claude.ai/favicon.ico` (mesma origem → canvas não "tainta"), desenha num canvas e usa `globalCompositeOperation = 'source-in'` pra trocar a cor mantendo a forma. Cada cor é gerada 1x e fica em cache.
 
 ## scripts/session-notepad.user.js
-Painel lateral de notas por sessão. Atalho `Ctrl+Shift+S` (ou botão injetado na barra de ações), `Esc` fecha. Redimensionável (largura salva em `localStorage` key `cc-notes:w`, padrão 750px). Nota salva por sessão em `localStorage` key `cc-notes:<sessionId>` (debounce 300ms). Links viram clicáveis (linkify). Editor é `contentEditable=plaintext-only` pra newline sair como `\n` literal. O linkify roda no `blur` (clicar fora) e ao abrir/trocar de sessão — **não** roda no `input` de propósito (re-renderizar a cada tecla pularia o caret / dobraria newline). `linkify` é round-trip idempotente, então rodar no blur é seguro.
+Painel lateral de notas por sessão. Atalho `Ctrl+Shift+S` (ou botão injetado na barra de ações), `Esc` fecha. Redimensionável (largura salva em `localStorage` key `cc-notes:w`, padrão 750px). Nota salva por sessão em `localStorage` key `cc-notes:<sessionId>` (debounce 300ms). Links viram clicáveis (linkify). Editor é `contentEditable=plaintext-only` pra newline sair como `\n` literal. O linkify roda no `blur` (clicar fora) e ao abrir/trocar de sessão — **não** roda no `input` de propósito (re-renderizar a cada tecla pularia o caret / dobraria newline). `linkify` é round-trip idempotente, então rodar no blur é seguro. **Cmd/Ctrl+click** num link abre em **aba de fundo** (não troca de aba) via clique sintético com modificador num `<a>` solto (`openBg`) — `window.open` traria a aba pra frente. Clique normal fora de edição abre em primeiro plano.
 
 O **handle de resize** (pill) fica escondido (`opacity: 0`) e só aparece no hover da borda ou durante o arraste (flags `gripHover`/`gripDrag` → `syncGrip`). Fica ~5px pra fora da borda (estilo Diff do Claude Code) via `marginLeft` negativo no `handle`.
 
@@ -47,4 +47,4 @@ Fatos do DOM:
 
 ## Testar/lintar
 - Não é um projeto Node; não há build. Edição manual do `.user.js`.
-- Lint opcional com ESLint (flat config), regras de formatação + `no-undef` com globals de browser. Globals usados: `window, document, location, localStorage, history, setTimeout, setInterval, clearTimeout, MutationObserver, Image, addEventListener, Promise`.
+- Lint opcional com ESLint (flat config), regras de formatação + `no-undef` com globals de browser. Globals usados: `window, document, location, localStorage, history, setTimeout, setInterval, clearTimeout, MutationObserver, MouseEvent, Image, addEventListener, Promise`.
