@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Claude Code Web — Notepad por sessão
 // @namespace    bruno.uptide
-// @version      2.13
+// @version      2.14
 // @description  Painel lateral de notas por sessão no Claude Code Web (empurra o conteúdo, estilo Diff). Atalho Ctrl+Shift+S, redimensionável, links clicáveis. Nota salva por sessionId no localStorage.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
@@ -47,6 +47,7 @@
   (document.head || document.documentElement).appendChild(st);
 
   let drawer = null, editor = null, currentId = null, saveT = null, btnRef = null;
+  let lastMode = null, sidebarApplied = false; // controle do layout por modo (sessao vs home)
 
   const escHtml = s => s.replace(/&/gu, '&amp;').replace(/</gu, '&lt;').replace(/>/gu, '&gt;');
   // newline fica como \n literal (editor usa white-space: pre-wrap) -> round-trip idempotente
@@ -54,7 +55,7 @@
   const getText = () => editor.innerText.replace(/\u00a0/gu, ' ');
   const setText = t => { editor.innerHTML = linkify(t); };
   // versao atual lida do Tampermonkey (GM_info), com fallback caso indisponivel.
-  const VERSION = (typeof GM_info !== 'undefined' && GM_info && GM_info.script && GM_info.script.version) || '2.13';
+  const VERSION = (typeof GM_info !== 'undefined' && GM_info && GM_info.script && GM_info.script.version) || '2.14';
   // abre link em nova aba. active=false => background (nao troca de aba); active=true => abre e foca.
   // GM_openInTab e a forma confiavel de background: o clique sintetico com modificador NAO funciona (testado, abriu em foreground).
   const openTab = (url, active) => { if (typeof GM_openInTab === 'function') GM_openInTab(url, { active, insert: true, setParent: true }); else window.open(url, '_blank', 'noopener'); };
@@ -98,9 +99,9 @@
     Object.assign(header.style, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px 10px 18px', color: MUTED, fontSize: '12px', userSelect: 'none', flex: '0 0 auto' });
     const lbl = document.createElement('span'); lbl.textContent = 'Notes (v' + VERSION + ')'; lbl.style.fontWeight = '600';
 
-    // toggle "Auto-open": abre o painel sozinho ao carregar a pagina (default on). Estado em A_KEY.
+    // toggle "Auto-open" (default on): em sessao abre as notas e esconde a sidebar; na home faz o oposto (sem notas, com sidebar). Estado em A_KEY.
     const auto = document.createElement('button'); auto.type = 'button';
-    auto.setAttribute('aria-label', 'Auto-open notes on load'); auto.title = 'Abrir o Notepad automaticamente ao carregar a sessao';
+    auto.setAttribute('aria-label', 'Auto-open notes on load'); auto.title = 'Em sessao: abre as notas e esconde a sidebar. Na home: fecha as notas e mostra a sidebar.';
     Object.assign(auto.style, { display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'transparent', border: '0', color: MUTED, cursor: 'pointer', padding: '0', fontSize: '11px', fontWeight: '600', userSelect: 'none' });
     const autoLbl = document.createElement('span'); autoLbl.textContent = 'Auto-open';
     const track = document.createElement('span');
@@ -109,7 +110,7 @@
     Object.assign(knob.style, { position: 'absolute', top: '2px', left: '2px', width: '11px', height: '11px', borderRadius: '50%', background: '#fff', transition: 'transform .2s ease' });
     track.appendChild(knob); auto.appendChild(autoLbl); auto.appendChild(track);
     const syncAuto = () => { const on = getAuto(); track.style.background = on ? ACCENT : 'rgba(255,255,255,0.18)'; knob.style.transform = on ? 'translateX(11px)' : 'translateX(0)'; };
-    auto.addEventListener('click', () => { setAuto(!getAuto()); syncAuto(); });
+    auto.addEventListener('click', () => { setAuto(!getAuto()); syncAuto(); lastMode = null; sidebarApplied = false; applyMode(); }); // flip aplica na hora
     syncAuto();
 
     const close = document.createElement('button'); close.type = 'button'; close.textContent = '×';
@@ -170,12 +171,35 @@
   function findBar() { const a = document.querySelector('button[aria-label="Share"], button[aria-label="Session actions"], button[aria-label="Diff"]'); return a ? (a.closest('span.epitaxy-titlebar-fade') || a.parentElement) : null; }
   function injectButton() { const bar = findBar(); if (!bar || bar.querySelector('[' + BTN_MARK + ']')) return; bar.insertBefore(makeButton(), bar.firstChild); }
   function syncSession() { const id = sid(); if (id !== currentId) { currentId = id; if (isOpen()) setText(id ? load(id) : ''); } }
-  function tick() { injectButton(); syncSession(); if (isOpen()) squeeze(true, parseInt(drawer.style.width, 10) || getW()); }
+
+  // Layout por modo (so com Auto-open ligado): sessao => notas abertas + sidebar escondida; home => notas fechadas + sidebar visivel.
+  // Notas: aplicadas so na transicao de modo (nao reabre se o usuario fechou na mesma pagina).
+  // Sidebar: a flag 'collapsed' do app e global/persistida (dframe-store), entao gerencio nas transicoes via clique no botao do app (passa pelo handler nativo).
+  function applyMode() {
+    const mode = sid() ? 'session' : 'home';
+    if (mode !== lastMode) {
+      lastMode = mode; sidebarApplied = false;
+      if (getAuto()) {
+        if (mode === 'session') { if (!isOpen()) setOpen(true, false); } // sem roubar o foco
+        else if (isOpen()) setOpen(false);
+      }
+    }
+    if (getAuto() && !sidebarApplied) {
+      const want = mode === 'session';                                    // session => colapsada; home => aberta
+      const collapsed = !!document.querySelector('[aria-label="Open sidebar"]');   // botao "Open" so existe quando colapsada
+      const expanded = !!document.querySelector('[aria-label="Collapse sidebar"]'); // "Collapse" so quando aberta
+      if (!collapsed && !expanded) return;                                // sidebar ainda nao montou; tenta no proximo tick
+      if (want === collapsed) { sidebarApplied = true; return; }          // ja esta como queremos
+      const btn = document.querySelector(want ? '[aria-label="Collapse sidebar"]' : '[aria-label="Open sidebar"]');
+      if (btn) btn.click();                                               // nao marca applied: o proximo tick confirma o novo estado
+    }
+  }
+
+  function tick() { injectButton(); syncSession(); applyMode(); if (isOpen()) squeeze(true, parseInt(drawer.style.width, 10) || getW()); }
 
   function start() {
     if (!document.body) { setTimeout(start, 50); return; }
-    buildDrawer(); tick();
-    if (getAuto()) setOpen(true, false); // autostart: abre sozinho, sem roubar o foco da pagina
+    buildDrawer(); tick(); // applyMode (dentro do tick) decide notas+sidebar conforme o modo
     let pend = false;
     const schedule = () => { if (pend) return; pend = true; setTimeout(() => { pend = false; tick(); }, 150); };
     new MutationObserver(schedule).observe(document.body, { subtree: true, childList: true });
