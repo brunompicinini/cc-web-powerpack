@@ -15,7 +15,7 @@ Repo público: `brunompicinini/cc-web-powerpack`, branch default `main`.
 
 ## Convenções
 - Cada script tem cabeçalho `// ==UserScript== ... ==/UserScript==`.
-- `@match https://claude.ai/code*`, `@run-at document-start`, `@grant none`.
+- `@match https://claude.ai/code*`, `@run-at document-start`. `@grant`: favicon usa `none`; **notepad usa `GM_openInTab`** (pra abrir link em aba de background de forma confiável — ver abaixo). Com `@grant` != none o script roda no sandbox do Tampermonkey (DOM/`history`/`location`/`localStorage` continuam reais; só não enxerga vars JS da página).
 - **Auto‑update:** `@downloadURL` e `@updateURL` apontam para a raw de `main`:
   `https://raw.githubusercontent.com/brunompicinini/cc-web-powerpack/main/scripts/<arquivo>.user.js`
 - **Toda mudança publicada exige subir o `@version`** — é o gatilho do auto‑update do Tampermonkey.
@@ -36,7 +36,7 @@ Fatos do DOM do Claude Code Web (descobertos inspecionando a página) que o scri
 Recolorir o favicon: carrega `claude.ai/favicon.ico` (mesma origem → canvas não "tainta"), desenha num canvas e usa `globalCompositeOperation = 'source-in'` pra trocar a cor mantendo a forma. Cada cor é gerada 1x e fica em cache.
 
 ## scripts/session-notepad.user.js
-Painel lateral de notas por sessão. Atalho `Ctrl+Shift+S` (ou botão injetado na barra de ações), `Esc` fecha. Redimensionável (largura salva em `localStorage` key `cc-notes:w`, padrão 750px). Nota salva por sessão em `localStorage` key `cc-notes:<sessionId>` (debounce 300ms). Links viram clicáveis (linkify). Editor é `contentEditable=plaintext-only` pra newline sair como `\n` literal. O linkify roda no `blur` (clicar fora) e ao abrir/trocar de sessão — **não** roda no `input` de propósito (re-renderizar a cada tecla pularia o caret / dobraria newline). `linkify` é round-trip idempotente, então rodar no blur é seguro. **Cmd/Ctrl+click** num link abre em **aba de fundo** (não troca de aba) via clique sintético com modificador num `<a>` solto (`openBg`) — `window.open` traria a aba pra frente. Clique normal fora de edição abre em primeiro plano.
+Painel lateral de notas por sessão. Atalho `Ctrl+Shift+S` (ou botão injetado na barra de ações), `Esc` fecha. Redimensionável (largura salva em `localStorage` key `cc-notes:w`, padrão 750px). Nota salva por sessão em `localStorage` key `cc-notes:<sessionId>` (debounce 300ms). Links viram clicáveis (linkify). Editor é `contentEditable=plaintext-only` pra newline sair como `\n` literal. O linkify roda no `blur` (clicar fora) e ao abrir/trocar de sessão — **não** roda no `input` de propósito (re-renderizar a cada tecla pularia o caret / dobraria newline). `linkify` é round-trip idempotente, então rodar no blur é seguro. **Clique normal** num link (fora de edição) abre em **aba de fundo** (`active:false`, não troca de aba); **Cmd/Ctrl+click** abre **e foca** (`active:true`). Ambos via `GM_openInTab` (`openTab`). Importante: o clique sintético com modificador num `<a>` **foi testado e NÃO abre em background** (abre em foreground) — por isso `GM_openInTab` e o `@grant`. O header mostra `Notes (v…)` lendo `GM_info.script.version` (single source da versão).
 
 O **handle de resize** (pill) fica escondido (`opacity: 0`) e só aparece no hover da borda ou durante o arraste (flags `gripHover`/`gripDrag` → `syncGrip`). Fica ~5px pra fora da borda (estilo Diff do Claude Code) via `marginLeft` negativo no `handle`.
 
@@ -47,4 +47,4 @@ Fatos do DOM:
 
 ## Testar/lintar
 - Não é um projeto Node; não há build. Edição manual do `.user.js`.
-- Lint opcional com ESLint (flat config), regras de formatação + `no-undef` com globals de browser. Globals usados: `window, document, location, localStorage, history, setTimeout, setInterval, clearTimeout, MutationObserver, MouseEvent, Image, addEventListener, Promise`.
+- Lint opcional com ESLint (flat config), regras de formatação + `no-undef` com globals de browser. Globals usados: `window, document, location, localStorage, history, setTimeout, setInterval, clearTimeout, MutationObserver, Image, addEventListener, Promise`. Notepad também usa `GM_openInTab` e `GM_info` (Tampermonkey).

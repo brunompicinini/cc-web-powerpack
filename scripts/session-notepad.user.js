@@ -1,12 +1,12 @@
 // ==UserScript==
 // @name         Claude Code Web — Notepad por sessão
 // @namespace    bruno.uptide
-// @version      2.10
+// @version      2.11
 // @description  Painel lateral de notas por sessão no Claude Code Web (empurra o conteúdo, estilo Diff). Atalho Ctrl+Shift+S, redimensionável, links clicáveis. Nota salva por sessionId no localStorage.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
 // @run-at       document-start
-// @grant        none
+// @grant        GM_openInTab
 // @noframes
 // @homepageURL  https://github.com/brunompicinini/cc-web-powerpack
 // @supportURL   https://github.com/brunompicinini/cc-web-powerpack/issues
@@ -49,9 +49,11 @@
   const linkify = t => escHtml(t || '').replace(/(?<url>https?:\/\/[^\s<]+)/gu, '<a href="$<url>" target="_blank" rel="noopener" style="color:' + ACCENT + ';text-decoration:underline">$<url></a>');
   const getText = () => editor.innerText.replace(/\u00a0/gu, ' ');
   const setText = t => { editor.innerHTML = linkify(t); };
-  // abre em aba de FUNDO (nao troca de aba): clique sintetico com modificador num <a>, igual ao cmd/ctrl+click nativo do Chrome.
-  // window.open() sempre traz a aba pra frente -> nao serve. anchor "solto" navega mesmo sem estar no DOM.
-  const openBg = url => { const a = document.createElement('a'); a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true, metaKey: true })); };
+  // versao atual lida do Tampermonkey (GM_info), com fallback caso indisponivel.
+  const VERSION = (typeof GM_info !== 'undefined' && GM_info && GM_info.script && GM_info.script.version) || '2.11';
+  // abre link em nova aba. active=false => background (nao troca de aba); active=true => abre e foca.
+  // GM_openInTab e a forma confiavel de background: o clique sintetico com modificador NAO funciona (testado, abriu em foreground).
+  const openTab = (url, active) => { if (typeof GM_openInTab === 'function') GM_openInTab(url, { active, insert: true, setParent: true }); else window.open(url, '_blank', 'noopener'); };
 
   function squeeze(on, w) { const m = document.getElementById('dframe-main'); if (m) m.style.right = on ? (w + 'px') : ''; }
 
@@ -90,7 +92,7 @@
 
     const header = document.createElement('div');
     Object.assign(header.style, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px 10px 18px', color: MUTED, fontSize: '12px', userSelect: 'none', flex: '0 0 auto' });
-    const lbl = document.createElement('span'); lbl.textContent = 'Notes'; lbl.style.fontWeight = '600';
+    const lbl = document.createElement('span'); lbl.textContent = 'Notes (v' + VERSION + ')'; lbl.style.fontWeight = '600';
     const close = document.createElement('button'); close.type = 'button'; close.textContent = '×';
     Object.assign(close.style, { background: 'transparent', border: '0', color: MUTED, fontSize: '18px', lineHeight: '1', cursor: 'pointer', padding: '0 4px', borderRadius: '6px' });
     close.addEventListener('mouseenter', () => { close.style.color = BRIGHT; });
@@ -110,8 +112,8 @@
     editor.addEventListener('mousedown', e => {
       const a = e.target.closest && e.target.closest('a'); if (!a) return;
       const editing = document.activeElement === editor || editor.contains(document.activeElement);
-      if (e.metaKey || e.ctrlKey) { e.preventDefault(); openBg(a.href); }                      // cmd/ctrl+click: aba de fundo, sem trocar
-      else if (!editing) { e.preventDefault(); window.open(a.href, '_blank', 'noopener'); }       // clique normal fora de edicao: traz pra frente
+      if (e.metaKey || e.ctrlKey) { e.preventDefault(); openTab(a.href, true); }    // cmd/ctrl+click: abre e FOCA
+      else if (!editing) { e.preventDefault(); openTab(a.href, false); }            // clique normal (fora de edicao): background, sem trocar
     });
 
     col.appendChild(header); col.appendChild(editor);
