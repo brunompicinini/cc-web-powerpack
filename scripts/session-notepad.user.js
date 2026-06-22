@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Claude Code Web — Notepad por sessão
 // @namespace    bruno.uptide
-// @version      2.11
+// @version      2.12
 // @description  Painel lateral de notas por sessão no Claude Code Web (empurra o conteúdo, estilo Diff). Atalho Ctrl+Shift+S, redimensionável, links clicáveis. Nota salva por sessionId no localStorage.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
@@ -50,7 +50,7 @@
   const getText = () => editor.innerText.replace(/\u00a0/gu, ' ');
   const setText = t => { editor.innerHTML = linkify(t); };
   // versao atual lida do Tampermonkey (GM_info), com fallback caso indisponivel.
-  const VERSION = (typeof GM_info !== 'undefined' && GM_info && GM_info.script && GM_info.script.version) || '2.11';
+  const VERSION = (typeof GM_info !== 'undefined' && GM_info && GM_info.script && GM_info.script.version) || '2.12';
   // abre link em nova aba. active=false => background (nao troca de aba); active=true => abre e foca.
   // GM_openInTab e a forma confiavel de background: o clique sintetico com modificador NAO funciona (testado, abriu em foreground).
   const openTab = (url, active) => { if (typeof GM_openInTab === 'function') GM_openInTab(url, { active, insert: true, setParent: true }); else window.open(url, '_blank', 'noopener'); };
@@ -109,11 +109,13 @@
     // ao perder o foco (clicar fora), salva na hora e re-linkifica — sem precisar recolher/reabrir o painel.
     // seguro fora do 'input' pq sem caret nao ha risco de pular cursor / dobrar newline (linkify e round-trip idempotente).
     editor.addEventListener('blur', () => { const id = sid(); const val = getText(); if (id) { clearTimeout(saveT); save(id, val); } setText(val); });
+    // clique num link SEMPRE abre (o editor fica focado por padrao, entao nao da pra exigir "fora de edicao").
+    // pra editar o texto de um link, posicione o caret clicando fora dele / pelas setas.
     editor.addEventListener('mousedown', e => {
       const a = e.target.closest && e.target.closest('a'); if (!a) return;
-      const editing = document.activeElement === editor || editor.contains(document.activeElement);
-      if (e.metaKey || e.ctrlKey) { e.preventDefault(); openTab(a.href, true); }    // cmd/ctrl+click: abre e FOCA
-      else if (!editing) { e.preventDefault(); openTab(a.href, false); }            // clique normal (fora de edicao): background, sem trocar
+      e.preventDefault();
+      if (e.metaKey || e.ctrlKey) openTab(a.href, true);   // cmd/ctrl+click: abre e FOCA
+      else openTab(a.href, false);                          // clique normal: background, sem trocar
     });
 
     col.appendChild(header); col.appendChild(editor);
