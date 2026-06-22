@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Claude Code Web — Notepad por sessão
 // @namespace    bruno.uptide
-// @version      2.12
+// @version      2.13
 // @description  Painel lateral de notas por sessão no Claude Code Web (empurra o conteúdo, estilo Diff). Atalho Ctrl+Shift+S, redimensionável, links clicáveis. Nota salva por sessionId no localStorage.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
@@ -33,6 +33,10 @@
   const maxW = () => window.innerWidth - 40;
   const getW = () => { const w = parseInt(localStorage.getItem(W_KEY) || DEFW, 10); return Math.min(maxW(), Math.max(MINW, isNaN(w) ? DEFW : w)); };
   const setW = w => { try { localStorage.setItem(W_KEY, String(Math.round(w))); } catch { /* ignore */ } };
+  // autostart: abre o painel sozinho ao carregar a pagina. Default = on (so fica off se o usuario gravar '0').
+  const A_KEY = 'cc-notes:autostart';
+  const getAuto = () => { try { return localStorage.getItem(A_KEY) !== '0'; } catch { return true; } };
+  const setAuto = on => { try { localStorage.setItem(A_KEY, on ? '1' : '0'); } catch { /* ignore */ } };
 
   // ícone notebook-pen (Lucide), 13px, herda a cor da barra
   const ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></svg>';
@@ -50,7 +54,7 @@
   const getText = () => editor.innerText.replace(/\u00a0/gu, ' ');
   const setText = t => { editor.innerHTML = linkify(t); };
   // versao atual lida do Tampermonkey (GM_info), com fallback caso indisponivel.
-  const VERSION = (typeof GM_info !== 'undefined' && GM_info && GM_info.script && GM_info.script.version) || '2.12';
+  const VERSION = (typeof GM_info !== 'undefined' && GM_info && GM_info.script && GM_info.script.version) || '2.13';
   // abre link em nova aba. active=false => background (nao troca de aba); active=true => abre e foca.
   // GM_openInTab e a forma confiavel de background: o clique sintetico com modificador NAO funciona (testado, abriu em foreground).
   const openTab = (url, active) => { if (typeof GM_openInTab === 'function') GM_openInTab(url, { active, insert: true, setParent: true }); else window.open(url, '_blank', 'noopener'); };
@@ -93,12 +97,31 @@
     const header = document.createElement('div');
     Object.assign(header.style, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px 10px 18px', color: MUTED, fontSize: '12px', userSelect: 'none', flex: '0 0 auto' });
     const lbl = document.createElement('span'); lbl.textContent = 'Notes (v' + VERSION + ')'; lbl.style.fontWeight = '600';
+
+    // toggle "Auto-open": abre o painel sozinho ao carregar a pagina (default on). Estado em A_KEY.
+    const auto = document.createElement('button'); auto.type = 'button';
+    auto.setAttribute('aria-label', 'Auto-open notes on load'); auto.title = 'Abrir o Notepad automaticamente ao carregar a sessao';
+    Object.assign(auto.style, { display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'transparent', border: '0', color: MUTED, cursor: 'pointer', padding: '0', fontSize: '11px', fontWeight: '600', userSelect: 'none' });
+    const autoLbl = document.createElement('span'); autoLbl.textContent = 'Auto-open';
+    const track = document.createElement('span');
+    Object.assign(track.style, { position: 'relative', width: '26px', height: '15px', borderRadius: '999px', background: 'rgba(255,255,255,0.18)', transition: 'background .2s ease', flex: '0 0 auto' });
+    const knob = document.createElement('span');
+    Object.assign(knob.style, { position: 'absolute', top: '2px', left: '2px', width: '11px', height: '11px', borderRadius: '50%', background: '#fff', transition: 'transform .2s ease' });
+    track.appendChild(knob); auto.appendChild(autoLbl); auto.appendChild(track);
+    const syncAuto = () => { const on = getAuto(); track.style.background = on ? ACCENT : 'rgba(255,255,255,0.18)'; knob.style.transform = on ? 'translateX(11px)' : 'translateX(0)'; };
+    auto.addEventListener('click', () => { setAuto(!getAuto()); syncAuto(); });
+    syncAuto();
+
     const close = document.createElement('button'); close.type = 'button'; close.textContent = '×';
     Object.assign(close.style, { background: 'transparent', border: '0', color: MUTED, fontSize: '18px', lineHeight: '1', cursor: 'pointer', padding: '0 4px', borderRadius: '6px' });
     close.addEventListener('mouseenter', () => { close.style.color = BRIGHT; });
     close.addEventListener('mouseleave', () => { close.style.color = MUTED; });
     close.addEventListener('click', () => setOpen(false));
-    header.appendChild(lbl); header.appendChild(close);
+
+    const right = document.createElement('div');
+    Object.assign(right.style, { display: 'flex', alignItems: 'center', gap: '12px' });
+    right.appendChild(auto); right.appendChild(close);
+    header.appendChild(lbl); header.appendChild(right);
 
     editor = document.createElement('div'); editor.id = 'cc-notes-editor';
     // plaintext-only: Enter insere \n literal (NAO cria <div>/<br>), entao innerText nao dobra newline ao salvar
@@ -125,9 +148,9 @@
 
   const isOpen = () => drawer && drawer.style.display !== 'none';
   function syncBtnColor() { if (btnRef) btnRef.style.color = isOpen() ? ACCENT : ICON_REST; }
-  function setOpen(open) {
+  function setOpen(open, focus = true) {
     if (!drawer) buildDrawer();
-    if (open) { const id = sid(); currentId = id; const w = getW(); drawer.style.width = w + 'px'; setText(id ? load(id) : ''); drawer.style.display = 'flex'; squeeze(true, w); editor.focus(); }
+    if (open) { const id = sid(); currentId = id; const w = getW(); drawer.style.width = w + 'px'; setText(id ? load(id) : ''); drawer.style.display = 'flex'; squeeze(true, w); if (focus) editor.focus(); }
     else { drawer.style.display = 'none'; squeeze(false); }
     syncBtnColor();
   }
@@ -152,6 +175,7 @@
   function start() {
     if (!document.body) { setTimeout(start, 50); return; }
     buildDrawer(); tick();
+    if (getAuto()) setOpen(true, false); // autostart: abre sozinho, sem roubar o foco da pagina
     let pend = false;
     const schedule = () => { if (pend) return; pend = true; setTimeout(() => { pend = false; tick(); }, 150); };
     new MutationObserver(schedule).observe(document.body, { subtree: true, childList: true });
