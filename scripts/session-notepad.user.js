@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Claude Code Web — Notepad por sessão
 // @namespace    bruno.uptide
-// @version      2.8
+// @version      2.9
 // @description  Painel lateral de notas por sessão no Claude Code Web (empurra o conteúdo, estilo Diff). Atalho Ctrl+Shift+S, redimensionável, links clicáveis. Nota salva por sessionId no localStorage.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
@@ -67,7 +67,7 @@
     const handle = document.createElement('div');
     Object.assign(handle.style, { flex: '0 0 10px', cursor: 'col-resize', display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: '-10px', zIndex: '1' });
     const grip = document.createElement('div');
-    Object.assign(grip.style, { width: '4px', height: '42px', borderRadius: '4px', background: 'rgba(255,255,255,0.35)', opacity: '0', transition: 'opacity .15s ease' });
+    Object.assign(grip.style, { width: '4px', height: '42px', borderRadius: '4px', background: '#FFFFFF29', opacity: '0', transition: 'opacity .3s ease' });
     handle.appendChild(grip);
     // grip some por padrao; aparece so no hover da borda ou enquanto arrasta
     let gripHover = false, gripDrag = false;
@@ -86,7 +86,7 @@
     Object.assign(col.style, { flex: '1', display: 'flex', flexDirection: 'column', minWidth: '0' });
 
     const header = document.createElement('div');
-    Object.assign(header.style, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 10px 8px 6px', color: MUTED, fontSize: '12px', userSelect: 'none', flex: '0 0 auto' });
+    Object.assign(header.style, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px 10px 18px', color: MUTED, fontSize: '12px', userSelect: 'none', flex: '0 0 auto' });
     const lbl = document.createElement('span'); lbl.textContent = 'Notes'; lbl.style.fontWeight = '600';
     const close = document.createElement('button'); close.type = 'button'; close.textContent = '×';
     Object.assign(close.style, { background: 'transparent', border: '0', color: MUTED, fontSize: '18px', lineHeight: '1', cursor: 'pointer', padding: '0 4px', borderRadius: '6px' });
@@ -99,8 +99,11 @@
     // plaintext-only: Enter insere \n literal (NAO cria <div>/<br>), entao innerText nao dobra newline ao salvar
     editor.contentEditable = 'plaintext-only'; editor.spellcheck = false;
     editor.setAttribute('data-ph', 'Markdown notes for this session…');
-    Object.assign(editor.style, { flex: '1', overflowY: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: BRIGHT, padding: '2px 12px 14px 6px', lineHeight: '1.55', outline: 'none' });
+    Object.assign(editor.style, { flex: '1', overflowY: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: BRIGHT, padding: '4px 18px 18px 18px', lineHeight: '1.55', outline: 'none' });
     editor.addEventListener('input', () => { const id = sid(); if (!id) return; const val = getText(); clearTimeout(saveT); saveT = setTimeout(() => save(id, val), 300); });
+    // ao perder o foco (clicar fora), salva na hora e re-linkifica — sem precisar recolher/reabrir o painel.
+    // seguro fora do 'input' pq sem caret nao ha risco de pular cursor / dobrar newline (linkify e round-trip idempotente).
+    editor.addEventListener('blur', () => { const id = sid(); const val = getText(); if (id) { clearTimeout(saveT); save(id, val); } setText(val); });
     editor.addEventListener('mousedown', e => {
       const a = e.target.closest && e.target.closest('a'); if (!a) return;
       const editing = document.activeElement === editor || editor.contains(document.activeElement);
