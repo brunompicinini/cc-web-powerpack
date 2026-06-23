@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Claude Code Web — Notepad por sessão
 // @namespace    bruno.uptide
-// @version      2.16
+// @version      2.17
 // @description  Painel lateral de notas por sessão no Claude Code Web (empurra o conteúdo, estilo Diff). Atalho Ctrl+Shift+S, redimensionável, links clicáveis. Nota salva por sessionId no localStorage.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
@@ -49,7 +49,7 @@
   st.textContent = '#cc-notes-editor:empty:before{content:attr(data-ph);color:rgba(255,255,255,0.3);pointer-events:none;}#cc-notes-editor a{color:' + ACCENT + ';text-decoration:underline;cursor:pointer;}#cc-notes-editor:focus{outline:none;}';
   (document.head || document.documentElement).appendChild(st);
 
-  let drawer = null, editor = null, currentId = null, saveT = null, btnRef = null;
+  let drawer = null, editor = null, currentId = null, saveT = null, btnRef = null, nameEl = null;
   let lastMode = null, sidebarApplied = false; // controle do layout por modo (sessao vs home)
 
   const escHtml = s => s.replace(/&/gu, '&amp;').replace(/</gu, '&lt;').replace(/>/gu, '&gt;');
@@ -58,10 +58,12 @@
   const getText = () => editor.innerText.replace(/\u00a0/gu, ' ');
   const setText = t => { editor.innerHTML = linkify(t); };
   // versao atual lida do Tampermonkey (GM_info), com fallback caso indisponivel.
-  const VERSION = (typeof GM_info !== 'undefined' && GM_info && GM_info.script && GM_info.script.version) || '2.16';
+  const VERSION = (typeof GM_info !== 'undefined' && GM_info && GM_info.script && GM_info.script.version) || '2.17';
   // abre link em nova aba. active=false => background (nao troca de aba); active=true => abre e foca.
   // GM_openInTab e a forma confiavel de background: o clique sintetico com modificador NAO funciona (testado, abriu em foreground).
   const openTab = (url, active) => { if (typeof GM_openInTab === 'function') GM_openInTab(url, { active, insert: true, setParent: true }); else window.open(url, '_blank', 'noopener'); };
+  // nome do chat = header editavel do Claude (button.cursor-text), inclui o prefixo [id]. Mesma fonte que o script do favicon usa.
+  const sessionName = () => { const b = document.querySelector('button.cursor-text'); return b ? (b.textContent || '').trim() : ''; };
 
   function squeeze(on, w) { const m = document.getElementById('dframe-main'); if (m) m.style.right = on ? (w + 'px') : ''; }
 
@@ -100,7 +102,14 @@
 
     const header = document.createElement('div');
     Object.assign(header.style, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px 10px 18px', color: MUTED, fontSize: '12px', userSelect: 'none', flex: '0 0 auto' });
-    const lbl = document.createElement('span'); lbl.textContent = 'Notes (v' + VERSION + ')'; lbl.style.fontWeight = '600';
+    const left = document.createElement('div');
+    Object.assign(left.style, { display: 'flex', alignItems: 'center', minWidth: '0', flex: '1', overflow: 'hidden', gap: '6px' });
+    const lbl = document.createElement('span'); lbl.textContent = 'Notes (v' + VERSION + ')';
+    Object.assign(lbl.style, { fontWeight: '600', flex: '0 0 auto', whiteSpace: 'nowrap' });
+    // nome do chat ao lado do badge: "Notes (vX) · [id] nome". Trunca com reticencias; atualiza no syncName (tick).
+    nameEl = document.createElement('span');
+    Object.assign(nameEl.style, { fontWeight: '600', minWidth: '0', flex: '0 1 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' });
+    left.appendChild(lbl); left.appendChild(nameEl);
 
     // toggle "Auto-open" (default on): em sessao abre as notas e esconde a sidebar; na home faz o oposto (sem notas, com sidebar). Estado em A_KEY.
     const auto = document.createElement('button'); auto.type = 'button';
@@ -123,9 +132,10 @@
     close.addEventListener('click', () => setOpen(false));
 
     const right = document.createElement('div');
-    Object.assign(right.style, { display: 'flex', alignItems: 'center', gap: '12px' });
+    Object.assign(right.style, { display: 'flex', alignItems: 'center', gap: '12px', flex: '0 0 auto', marginLeft: '12px' });
     right.appendChild(auto); right.appendChild(close);
-    header.appendChild(lbl); header.appendChild(right);
+    header.appendChild(left); header.appendChild(right);
+    syncName();
 
     editor = document.createElement('div'); editor.id = 'cc-notes-editor';
     // plaintext-only: Enter insere \n literal (NAO cria <div>/<br>), entao innerText nao dobra newline ao salvar
@@ -174,6 +184,9 @@
   function findBar() { const a = document.querySelector('button[aria-label="Share"], button[aria-label="Session actions"], button[aria-label="Diff"]'); return a ? (a.closest('span.epitaxy-titlebar-fade') || a.parentElement) : null; }
   function injectButton() { const bar = findBar(); if (!bar || bar.querySelector('[' + BTN_MARK + ']')) return; bar.insertBefore(makeButton(), bar.firstChild); }
   function syncSession() { const id = sid(); if (id !== currentId) { currentId = id; if (isOpen()) setText(id ? loadNote(id) : ''); } }
+  // mostra o nome do chat ao lado do badge (so em sessao); atualiza ao trocar de sessao ou renomear.
+  // separador via gap do container (flex item descarta whitespace inicial, entao nao da pra usar espaco antes do ·)
+  function syncName() { if (!nameEl) return; const n = sid() ? sessionName() : ''; const txt = n ? '· ' + n : ''; if (nameEl.textContent !== txt) nameEl.textContent = txt; }
 
   // Layout por modo (so com Auto-open ligado): sessao => notas abertas + sidebar escondida; home => notas fechadas + sidebar visivel.
   // Notas: aplicadas so na transicao de modo (nao reabre se o usuario fechou na mesma pagina).
@@ -198,7 +211,7 @@
     }
   }
 
-  function tick() { injectButton(); syncSession(); applyMode(); if (isOpen()) squeeze(true, parseInt(drawer.style.width, 10) || getW()); }
+  function tick() { injectButton(); syncSession(); applyMode(); syncName(); if (isOpen()) squeeze(true, parseInt(drawer.style.width, 10) || getW()); }
 
   function start() {
     if (!document.body) { setTimeout(start, 50); return; }
