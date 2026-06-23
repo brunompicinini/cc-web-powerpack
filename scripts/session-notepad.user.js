@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Claude Code Web — Notepad por sessão
 // @namespace    bruno.uptide
-// @version      2.14
+// @version      2.15
 // @description  Painel lateral de notas por sessão no Claude Code Web (empurra o conteúdo, estilo Diff). Atalho Ctrl+Shift+S, redimensionável, links clicáveis. Nota salva por sessionId no localStorage.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
@@ -27,8 +27,11 @@
   const ACCENT = '#0099ff'; // azul do botão ativo + links (igual ao Claude Code Web)
   const MINW = 300, DEFW = 750; // largura padrao 750px; sem teto fixo (limita so a janela)
 
+  // template padrao pra notas novas (sessao ainda sem nota salva) — exibido, salva so quando o usuario editar
+  const TEMPLATE = '# STATUS\n\n\n# PRs\n\n\n# CLICKUP\n\n\n# LINKS';
   const sid = () => (location.pathname.match(/session_[A-Za-z0-9]+/u) || [])[0] || null;
   const load = id => { try { return localStorage.getItem(KEY + id) || ''; } catch { return ''; } };
+  const loadNote = id => load(id) || TEMPLATE; // nota da sessao, ou template padrao se vazia
   const save = (id, v) => { try { localStorage.setItem(KEY + id, v); } catch { /* ignore */ } };
   const maxW = () => window.innerWidth - 40;
   const getW = () => { const w = parseInt(localStorage.getItem(W_KEY) || DEFW, 10); return Math.min(maxW(), Math.max(MINW, isNaN(w) ? DEFW : w)); };
@@ -55,7 +58,7 @@
   const getText = () => editor.innerText.replace(/\u00a0/gu, ' ');
   const setText = t => { editor.innerHTML = linkify(t); };
   // versao atual lida do Tampermonkey (GM_info), com fallback caso indisponivel.
-  const VERSION = (typeof GM_info !== 'undefined' && GM_info && GM_info.script && GM_info.script.version) || '2.14';
+  const VERSION = (typeof GM_info !== 'undefined' && GM_info && GM_info.script && GM_info.script.version) || '2.15';
   // abre link em nova aba. active=false => background (nao troca de aba); active=true => abre e foca.
   // GM_openInTab e a forma confiavel de background: o clique sintetico com modificador NAO funciona (testado, abriu em foreground).
   const openTab = (url, active) => { if (typeof GM_openInTab === 'function') GM_openInTab(url, { active, insert: true, setParent: true }); else window.open(url, '_blank', 'noopener'); };
@@ -151,7 +154,7 @@
   function syncBtnColor() { if (btnRef) btnRef.style.color = isOpen() ? ACCENT : ICON_REST; }
   function setOpen(open, focus = true) {
     if (!drawer) buildDrawer();
-    if (open) { const id = sid(); currentId = id; const w = getW(); drawer.style.width = w + 'px'; setText(id ? load(id) : ''); drawer.style.display = 'flex'; squeeze(true, w); if (focus) editor.focus(); }
+    if (open) { const id = sid(); currentId = id; const w = getW(); drawer.style.width = w + 'px'; setText(id ? loadNote(id) : ''); drawer.style.display = 'flex'; squeeze(true, w); if (focus) editor.focus(); }
     else { drawer.style.display = 'none'; squeeze(false); }
     syncBtnColor();
   }
@@ -170,7 +173,7 @@
   }
   function findBar() { const a = document.querySelector('button[aria-label="Share"], button[aria-label="Session actions"], button[aria-label="Diff"]'); return a ? (a.closest('span.epitaxy-titlebar-fade') || a.parentElement) : null; }
   function injectButton() { const bar = findBar(); if (!bar || bar.querySelector('[' + BTN_MARK + ']')) return; bar.insertBefore(makeButton(), bar.firstChild); }
-  function syncSession() { const id = sid(); if (id !== currentId) { currentId = id; if (isOpen()) setText(id ? load(id) : ''); } }
+  function syncSession() { const id = sid(); if (id !== currentId) { currentId = id; if (isOpen()) setText(id ? loadNote(id) : ''); } }
 
   // Layout por modo (so com Auto-open ligado): sessao => notas abertas + sidebar escondida; home => notas fechadas + sidebar visivel.
   // Notas: aplicadas so na transicao de modo (nao reabre se o usuario fechou na mesma pagina).
