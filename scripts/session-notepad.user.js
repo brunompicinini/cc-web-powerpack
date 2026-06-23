@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Claude Code Web — Notepad por sessão
 // @namespace    bruno.uptide
-// @version      2.15
+// @version      2.16
 // @description  Painel lateral de notas por sessão no Claude Code Web (empurra o conteúdo, estilo Diff). Atalho Ctrl+Shift+S, redimensionável, links clicáveis. Nota salva por sessionId no localStorage.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
@@ -28,7 +28,7 @@
   const MINW = 300, DEFW = 750; // largura padrao 750px; sem teto fixo (limita so a janela)
 
   // template padrao pra notas novas (sessao ainda sem nota salva) — exibido, salva so quando o usuario editar
-  const TEMPLATE = '# STATUS\n\n\n# PRs\n\n\n# CLICKUP\n\n\n# LINKS';
+  const TEMPLATE = '# STATUS\n\n\n# PRs\n\n\n# CLICKUP\n\n\n# LINKS\n\n\n# NOTES';
   const sid = () => (location.pathname.match(/session_[A-Za-z0-9]+/u) || [])[0] || null;
   const load = id => { try { return localStorage.getItem(KEY + id) || ''; } catch { return ''; } };
   const loadNote = id => load(id) || TEMPLATE; // nota da sessao, ou template padrao se vazia
@@ -58,7 +58,7 @@
   const getText = () => editor.innerText.replace(/\u00a0/gu, ' ');
   const setText = t => { editor.innerHTML = linkify(t); };
   // versao atual lida do Tampermonkey (GM_info), com fallback caso indisponivel.
-  const VERSION = (typeof GM_info !== 'undefined' && GM_info && GM_info.script && GM_info.script.version) || '2.15';
+  const VERSION = (typeof GM_info !== 'undefined' && GM_info && GM_info.script && GM_info.script.version) || '2.16';
   // abre link em nova aba. active=false => background (nao troca de aba); active=true => abre e foca.
   // GM_openInTab e a forma confiavel de background: o clique sintetico com modificador NAO funciona (testado, abriu em foreground).
   const openTab = (url, active) => { if (typeof GM_openInTab === 'function') GM_openInTab(url, { active, insert: true, setParent: true }); else window.open(url, '_blank', 'noopener'); };
