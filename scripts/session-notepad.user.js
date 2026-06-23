@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Claude Code Web — Notepad por sessão
 // @namespace    bruno.uptide
-// @version      2.17
+// @version      2.18
 // @description  Painel lateral de notas por sessão no Claude Code Web (empurra o conteúdo, estilo Diff). Atalho Ctrl+Shift+S, redimensionável, links clicáveis. Nota salva por sessionId no localStorage.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
@@ -49,7 +49,7 @@
   st.textContent = '#cc-notes-editor:empty:before{content:attr(data-ph);color:rgba(255,255,255,0.3);pointer-events:none;}#cc-notes-editor a{color:' + ACCENT + ';text-decoration:underline;cursor:pointer;}#cc-notes-editor:focus{outline:none;}';
   (document.head || document.documentElement).appendChild(st);
 
-  let drawer = null, editor = null, currentId = null, saveT = null, btnRef = null, nameEl = null;
+  let drawer = null, editor = null, currentId = null, saveT = null, btnRef = null, nameEl = null, sepEl = null;
   let lastMode = null, sidebarApplied = false; // controle do layout por modo (sessao vs home)
 
   const escHtml = s => s.replace(/&/gu, '&amp;').replace(/</gu, '&lt;').replace(/>/gu, '&gt;');
@@ -58,7 +58,7 @@
   const getText = () => editor.innerText.replace(/\u00a0/gu, ' ');
   const setText = t => { editor.innerHTML = linkify(t); };
   // versao atual lida do Tampermonkey (GM_info), com fallback caso indisponivel.
-  const VERSION = (typeof GM_info !== 'undefined' && GM_info && GM_info.script && GM_info.script.version) || '2.17';
+  const VERSION = (typeof GM_info !== 'undefined' && GM_info && GM_info.script && GM_info.script.version) || '2.18';
   // abre link em nova aba. active=false => background (nao troca de aba); active=true => abre e foca.
   // GM_openInTab e a forma confiavel de background: o clique sintetico com modificador NAO funciona (testado, abriu em foreground).
   const openTab = (url, active) => { if (typeof GM_openInTab === 'function') GM_openInTab(url, { active, insert: true, setParent: true }); else window.open(url, '_blank', 'noopener'); };
@@ -106,10 +106,13 @@
     Object.assign(left.style, { display: 'flex', alignItems: 'center', minWidth: '0', flex: '1', overflow: 'hidden', gap: '6px' });
     const lbl = document.createElement('span'); lbl.textContent = 'Notes (v' + VERSION + ')';
     Object.assign(lbl.style, { fontWeight: '600', flex: '0 0 auto', whiteSpace: 'nowrap' });
-    // nome do chat ao lado do badge: "Notes (vX) · [id] nome". Trunca com reticencias; atualiza no syncName (tick).
+    // nome do chat: "Notes (vX) · [id] nome". O separador e um span proprio; o gap do container da os 6px dos DOIS lados do ·
+    // (espaco no texto nao serve: flex item descarta whitespace inicial e o trailing fica fragil). Nome trunca com reticencias.
+    sepEl = document.createElement('span'); sepEl.textContent = '·';
+    Object.assign(sepEl.style, { fontWeight: '600', flex: '0 0 auto' });
     nameEl = document.createElement('span');
     Object.assign(nameEl.style, { fontWeight: '600', minWidth: '0', flex: '0 1 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' });
-    left.appendChild(lbl); left.appendChild(nameEl);
+    left.appendChild(lbl); left.appendChild(sepEl); left.appendChild(nameEl);
 
     // toggle "Auto-open" (default on): em sessao abre as notas e esconde a sidebar; na home faz o oposto (sem notas, com sidebar). Estado em A_KEY.
     const auto = document.createElement('button'); auto.type = 'button';
@@ -185,8 +188,15 @@
   function injectButton() { const bar = findBar(); if (!bar || bar.querySelector('[' + BTN_MARK + ']')) return; bar.insertBefore(makeButton(), bar.firstChild); }
   function syncSession() { const id = sid(); if (id !== currentId) { currentId = id; if (isOpen()) setText(id ? loadNote(id) : ''); } }
   // mostra o nome do chat ao lado do badge (so em sessao); atualiza ao trocar de sessao ou renomear.
-  // separador via gap do container (flex item descarta whitespace inicial, entao nao da pra usar espaco antes do ·)
-  function syncName() { if (!nameEl) return; const n = sid() ? sessionName() : ''; const txt = n ? '· ' + n : ''; if (nameEl.textContent !== txt) nameEl.textContent = txt; }
+  // mostra "· nome" so em sessao; esconde o separador junto (display none tira tambem o gap, sem espaco sobrando depois do badge na home)
+  function syncName() {
+    if (!nameEl) return;
+    const n = sid() ? sessionName() : '';
+    if (nameEl.textContent !== n) nameEl.textContent = n;
+    const show = n ? '' : 'none';
+    if (sepEl && sepEl.style.display !== show) sepEl.style.display = show;
+    if (nameEl.style.display !== show) nameEl.style.display = show;
+  }
 
   // Layout por modo (so com Auto-open ligado): sessao => notas abertas + sidebar escondida; home => notas fechadas + sidebar visivel.
   // Notas: aplicadas so na transicao de modo (nao reabre se o usuario fechou na mesma pagina).
