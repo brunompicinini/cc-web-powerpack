@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Claude Code Web — Notepad por sessão
 // @namespace    bruno.uptide
-// @version      2.19
+// @version      2.20
 // @description  Painel lateral de notas por sessão no Claude Code Web (empurra o conteúdo, estilo Diff). Atalho Ctrl+Shift+S, redimensionável, links clicáveis. Nota salva por sessionId no localStorage.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
@@ -59,7 +59,7 @@
   const getText = () => editor.innerText.replace(/\u00a0/gu, ' ');
   const setText = t => { editor.innerHTML = linkify(t); lastRendered = t; };
   // versao atual lida do Tampermonkey (GM_info), com fallback caso indisponivel.
-  const VERSION = (typeof GM_info !== 'undefined' && GM_info && GM_info.script && GM_info.script.version) || '2.19';
+  const VERSION = (typeof GM_info !== 'undefined' && GM_info && GM_info.script && GM_info.script.version) || '2.20';
   // abre link em nova aba. active=false => background (nao troca de aba); active=true => abre e foca.
   // GM_openInTab e a forma confiavel de background: o clique sintetico com modificador NAO funciona (testado, abriu em foreground).
   const openTab = (url, active) => { if (typeof GM_openInTab === 'function') GM_openInTab(url, { active, insert: true, setParent: true }); else window.open(url, '_blank', 'noopener'); };
@@ -149,8 +149,11 @@
     editor.addEventListener('input', () => { const id = sid(); if (!id) return; const val = getText(); clearTimeout(saveT); saveT = setTimeout(() => save(id, val), 300); });
     // ao perder o foco (clicar fora), salva na hora e re-linkifica — sem precisar recolher/reabrir o painel.
     // seguro fora do 'input' pq sem caret nao ha risco de pular cursor / dobrar newline (linkify e round-trip idempotente).
-    // so re-renderiza se o texto mudou: trocar de aba do navegador (sem editar) nao reescreve o innerHTML, entao o caret sobrevive ao voltar.
-    editor.addEventListener('blur', () => { const id = sid(); const val = getText(); if (id) { clearTimeout(saveT); save(id, val); } if (val !== lastRendered) setText(val); });
+    // so re-renderiza num blur "real" (foco indo pra outro elemento da MESMA pagina, document.hasFocus()===true).
+    // se o documento perdeu o foco (troca de aba/janela, hasFocus===false), NAO reescreve o innerHTML -> o caret sobrevive ao voltar,
+    // mesmo depois de editar. robusto a intermitencia do tab-switch: se o blur nao disparar, o DOM tambem fica intacto.
+    // o linkify do que foi digitado fica pro proximo blur real / troca de sessao. (val !== lastRendered evita re-render redundante.)
+    editor.addEventListener('blur', () => { const id = sid(); const val = getText(); if (id) { clearTimeout(saveT); save(id, val); } if (val !== lastRendered && document.hasFocus()) setText(val); });
     // clique num link SEMPRE abre (o editor fica focado por padrao, entao nao da pra exigir "fora de edicao").
     // pra editar o texto de um link, posicione o caret clicando fora dele / pelas setas.
     editor.addEventListener('mousedown', e => {
