@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Claude Code Web — Notepad por sessão
 // @namespace    bruno.uptide
-// @version      2.18
+// @version      2.19
 // @description  Painel lateral de notas por sessão no Claude Code Web (empurra o conteúdo, estilo Diff). Atalho Ctrl+Shift+S, redimensionável, links clicáveis. Nota salva por sessionId no localStorage.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
@@ -50,15 +50,16 @@
   (document.head || document.documentElement).appendChild(st);
 
   let drawer = null, editor = null, currentId = null, saveT = null, btnRef = null, nameEl = null, sepEl = null;
+  let lastRendered = null; // ultimo texto renderizado no editor; blur so re-renderiza se mudou (preserva o caret ao trocar de aba sem editar)
   let lastMode = null, sidebarApplied = false; // controle do layout por modo (sessao vs home)
 
   const escHtml = s => s.replace(/&/gu, '&amp;').replace(/</gu, '&lt;').replace(/>/gu, '&gt;');
   // newline fica como \n literal (editor usa white-space: pre-wrap) -> round-trip idempotente
   const linkify = t => escHtml(t || '').replace(/(?<url>https?:\/\/[^\s<]+)/gu, '<a href="$<url>" target="_blank" rel="noopener" style="color:' + ACCENT + ';text-decoration:underline">$<url></a>');
   const getText = () => editor.innerText.replace(/\u00a0/gu, ' ');
-  const setText = t => { editor.innerHTML = linkify(t); };
+  const setText = t => { editor.innerHTML = linkify(t); lastRendered = t; };
   // versao atual lida do Tampermonkey (GM_info), com fallback caso indisponivel.
-  const VERSION = (typeof GM_info !== 'undefined' && GM_info && GM_info.script && GM_info.script.version) || '2.18';
+  const VERSION = (typeof GM_info !== 'undefined' && GM_info && GM_info.script && GM_info.script.version) || '2.19';
   // abre link em nova aba. active=false => background (nao troca de aba); active=true => abre e foca.
   // GM_openInTab e a forma confiavel de background: o clique sintetico com modificador NAO funciona (testado, abriu em foreground).
   const openTab = (url, active) => { if (typeof GM_openInTab === 'function') GM_openInTab(url, { active, insert: true, setParent: true }); else window.open(url, '_blank', 'noopener'); };
@@ -148,7 +149,8 @@
     editor.addEventListener('input', () => { const id = sid(); if (!id) return; const val = getText(); clearTimeout(saveT); saveT = setTimeout(() => save(id, val), 300); });
     // ao perder o foco (clicar fora), salva na hora e re-linkifica — sem precisar recolher/reabrir o painel.
     // seguro fora do 'input' pq sem caret nao ha risco de pular cursor / dobrar newline (linkify e round-trip idempotente).
-    editor.addEventListener('blur', () => { const id = sid(); const val = getText(); if (id) { clearTimeout(saveT); save(id, val); } setText(val); });
+    // so re-renderiza se o texto mudou: trocar de aba do navegador (sem editar) nao reescreve o innerHTML, entao o caret sobrevive ao voltar.
+    editor.addEventListener('blur', () => { const id = sid(); const val = getText(); if (id) { clearTimeout(saveT); save(id, val); } if (val !== lastRendered) setText(val); });
     // clique num link SEMPRE abre (o editor fica focado por padrao, entao nao da pra exigir "fora de edicao").
     // pra editar o texto de um link, posicione o caret clicando fora dele / pelas setas.
     editor.addEventListener('mousedown', e => {
