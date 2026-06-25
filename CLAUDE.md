@@ -28,9 +28,9 @@ Recolore o favicon real do Claude conforme o status da sessão aberta e troca o 
 Fatos do DOM do Claude Code Web (descobertos inspecionando a página) que o script depende:
 - A lista de sessões fica em `aside.dframe-sidebar`; cada linha é um `[data-row]`; a aberta tem `[data-selected]`.
 - **Status vivo** vem de um `[role="status"]` dentro da linha, no `aria-label`: `Running` / `Awaiting input` / `Ready`.
-- **Merged**: uma sessão de PR mergeado **não tem `[role="status"]`** na linha. O estado vem de um badge separado `[role="img"]` cujo `aria-label` contém `Merged` (ex.: `#21, #4 · Merged`). Cuidado: outros `[role="img"]` na linha são avatares (ex.: `Bruno Picinini`) — filtre por `\bMerged\b`.
-- Cor do merged usada (`#b796ff`) = o roxo nativo do Claude (`rgb(183,150,255)`).
-- **Prioridade: status vivo > merged.** Se a linha tem status vivo, ele ganha; só cai pra roxo quando não há status e existe o badge Merged. (Na prática não coexistem, mas se um dia coexistirem, running/awaiting é mais útil de ver.)
+- **PR (merged/open)**: uma sessão com PR **não tem `[role="status"]`** na linha — o estado vem de um badge separado `[role="img"]` cujo `aria-label` é `#21, #4 · Merged` (mergeado) ou `#861 · Open` (aberto). `currentPR()` retorna `'merged'` / `'open'` / `null`, filtrando por `\bMerged\b` / `\bOpen\b` (merged tem prioridade — não coexistem). Cuidado: outros `[role="img"]` na linha são avatares (ex.: `Bruno Picinini`).
+- Cor do merged (`#b796ff`) = o roxo nativo do Claude (`rgb(183,150,255)`). PR aberto usa um teal próprio (`#2dd4bf`) — não o verde do app (`rgb(50,215,75)`), de propósito, pra **não** colidir visualmente com o verde de `running` (`#22c55e`).
+- **Prioridade: status vivo > PR (merged/open).** Se a linha tem status vivo, ele ganha; só cai pra roxo/teal quando não há status e existe o badge. (Na prática não coexistem, mas se um dia coexistirem, running/awaiting é mais útil de ver.)
 - O nome da sessão (header editável) é `button.cursor-text`.
 
 Recolorir o favicon: carrega `claude.ai/favicon.ico` (mesma origem → canvas não "tainta"), desenha num canvas e usa `globalCompositeOperation = 'source-in'` pra trocar a cor mantendo a forma. Cada cor é gerada 1x e fica em cache.

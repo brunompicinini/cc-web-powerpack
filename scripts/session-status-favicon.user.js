@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Claude Code Web — Session Status Favicon + Title
 // @namespace    bruno.uptide
-// @version      2.5
-// @description  Favicon = status da sessão (verde=running, amarelo=awaiting input, azul=ready, roxo=merged), recolorindo o ícone real do Claude. Título da aba = nome da sessão.
+// @version      2.6
+// @description  Favicon = status da sessão (verde=running, teal=PR aberto, amarelo=awaiting input, azul=ready, roxo=merged), recolorindo o ícone real do Claude. Título da aba = nome da sessão.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
 // @run-at       document-start
@@ -22,7 +22,7 @@
   // ============================================================
   // 1) STATUS no FAVICON
   // ============================================================
-  const COLORS = { running: '#22c55e', awaiting: '#f5b301', ready: '#4a9eff', merged: '#b796ff' }; // null = mantém o coral original
+  const COLORS = { running: '#22c55e', awaiting: '#f5b301', ready: '#4a9eff', merged: '#b796ff', open: '#2dd4bf' }; // null = mantém o coral original
   const KEY = { 'Running': 'running', 'Awaiting input': 'awaiting', 'Ready': 'ready' };
 
   const statusEls = () =>
@@ -42,14 +42,17 @@
     return s ? s.getAttribute('aria-label') : null;
   }
 
-  // Sessão com PR mergeado NÃO tem [role="status"] na linha — o estado vem de um
-  // badge [role="img"] cujo aria-label contém "Merged" (ex.: "#21, #4 · Merged").
+  // Sessão com PR (sem [role="status"] vivo na linha) — o estado vem de um badge
+  // [role="img"] cujo aria-label é "#21, #4 · Merged" (mergeado) ou "#861 · Open" (aberto).
   // Como não há status, casamos só pela linha selecionada (data-selected).
-  function currentMerged() {
+  // Retorna 'merged' | 'open' | null (merged tem prioridade — não coexistem na prática).
+  function currentPR() {
     const row = document.querySelector('[data-row][data-selected]');
-    if (!row) return false;
-    return [...row.querySelectorAll('[role="img"]')]
-      .some(i => /\bMerged\b/i.test(i.getAttribute('aria-label') || ''));
+    if (!row) return null;
+    const labels = [...row.querySelectorAll('[role="img"]')].map(i => i.getAttribute('aria-label') || '');
+    if (labels.some(a => /\bMerged\b/i.test(a))) return 'merged';
+    if (labels.some(a => /\bOpen\b/i.test(a))) return 'open';
+    return null;
   }
 
   // recolore o ícone real do Claude. Carrega o favicon.ico da própria claude.ai
@@ -91,8 +94,8 @@
     } else {
       const lbl = currentLabel();
       if (lbl) k = KEY[norm(lbl)] || 'default'; // norm: o aria-label pode vir com espaco/zero-width e quebrar o lookup
-      else if (currentMerged()) k = 'merged'; // sem status na linha + badge Merged => roxo
-      else { if (lastKey) return; k = 'default'; } // sessão ainda carregando: mantém o último
+      else { const pr = currentPR(); if (pr) k = pr; // sem status na linha + badge PR => roxo (merged) / verde (open)
+             else { if (lastKey) return; k = 'default'; } } // sessão ainda carregando: mantém o último
     }
     if (k === lastKey) return;
     if (cache[k] === undefined) {
