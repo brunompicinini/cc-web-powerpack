@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Claude Code Web — Switch Session Hotkey (⌘⌥[ / ⌘⌥]) + Rename (⌃⇧R)
 // @namespace    bruno.uptide
-// @version      1.1
-// @description  Cmd+Alt+[ e Cmd+Alt+] trocam a sessão aberta (anda pra cima/baixo na lista da sidebar), igual o Cmd+Shift+[ / ] do navegador Dia. Funciona mesmo com a sidebar colapsada. Ctrl+Shift+R renomeia a sessão aberta (abre o input inline do título).
+// @version      1.2
+// @description  Cmd+Alt+[ e Cmd+Alt+] trocam a sessão aberta (anda pra cima/baixo na lista da sidebar), igual o Cmd+Shift+[ / ] do navegador Dia. Funciona mesmo com a sidebar colapsada. Ctrl+Shift+R renomeia a sessão aberta (abre o input do título e seleciona a 1ª palavra do nome, pulando o 1º caractere — pronto pra digitar).
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
 // @run-at       document-start
@@ -57,7 +57,21 @@
   // Se já estiver renomeando (input aberto, button ausente), o querySelector dá null e o `if (title)` simplesmente não faz nada.
   function rename() {
     const title = document.querySelector('button.cursor-text');
-    if (title) title.click();
+    if (!title) return;
+    title.click();
+    // O rename abre com TODO o nome selecionado. Reposiciona pra: pular o 1º caractere (ex.: o "[" da tag) e
+    // selecionar a 1ª palavra — equivale a ← (início) + → (pula 1º char) + Alt+Shift+→ (seleciona 1ª palavra),
+    // pronto pra digitar por cima. Eventos de teclado sintéticos NÃO movem o caret; usamos a Selection API direto.
+    // O <input> aparece async (re-render do React), então re-tenta até ele focar. Testado: a seleção sobrevive ao re-render.
+    let tries = 12;
+    const place = () => {
+      const inp = document.activeElement;
+      if (inp && inp.tagName === 'INPUT' && typeof inp.selectionStart === 'number') {
+        const v = inp.value, m = v.slice(1).match(/^\W*\w+/u);
+        inp.setSelectionRange(1, m ? 1 + m[0].length : v.length);
+      } else if (tries-- > 0) setTimeout(place, 30);
+    };
+    setTimeout(place, 0);
   }
 
   // e.code (tecla física) e não e.key: no Mac, Alt+[ vira "“" e Alt+] vira "‘" — code continua BracketLeft/Right.
