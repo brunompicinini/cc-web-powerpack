@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Claude Code Web — Switch Session Hotkey (⌘⌥[ / ⌘⌥])
+// @name         Claude Code Web — Switch Session Hotkey (⌘⌥[ / ⌘⌥]) + Rename (⌃⇧R)
 // @namespace    bruno.uptide
-// @version      1.0
-// @description  Cmd+Alt+[ e Cmd+Alt+] trocam a sessão aberta (anda pra cima/baixo na lista da sidebar), igual o Cmd+Shift+[ / ] do navegador Dia. Funciona mesmo com a sidebar colapsada.
+// @version      1.1
+// @description  Cmd+Alt+[ e Cmd+Alt+] trocam a sessão aberta (anda pra cima/baixo na lista da sidebar), igual o Cmd+Shift+[ / ] do navegador Dia. Funciona mesmo com a sidebar colapsada. Ctrl+Shift+R renomeia a sessão aberta (abre o input inline do título).
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
 // @run-at       document-start
@@ -18,6 +18,10 @@
   'use strict';
   if (window.ccSwitchLoaded) return;
   window.ccSwitchLoaded = true;
+
+  // Mac? (navigator.platform e deprecated mas confiavel pra Mac; userAgent de fallback.) Usado pra gatear o rename:
+  // no Windows/Linux Ctrl+Shift+R e o hard-reload do navegador e o preventDefault em captura nao o segura.
+  const isMac = /Mac/i.test(navigator.platform || navigator.userAgent || '');
 
   // Linhas de sessão na sidebar: a sidebar mistura itens de menu e sessões, ambos com [data-row].
   // - Itens de menu (New session, Routines, Customize, More) são <button data-row> (sem botão interno).
@@ -46,11 +50,29 @@
     if (btn) btn.click();
   }
 
+  // Renomeia a sessão aberta. O título no header é o button.cursor-text (mesma fonte que o favicon/notepad usam);
+  // clicar nele entra no modo de edição inline (vira um <input> focado, com o nome todo já selecionado, pronto pra
+  // digitar). Testado: .click() sintético dispara o handler do React e abre o input. Não existe atalho global nativo
+  // pro rename — o "R" que aparece no menu ⋮ é só o acelerador do menu (vale com o menu aberto), não um hotkey global.
+  // Se já estiver renomeando (input aberto, button ausente), o querySelector dá null e o `if (title)` simplesmente não faz nada.
+  function rename() {
+    const title = document.querySelector('button.cursor-text');
+    if (title) title.click();
+  }
+
   // e.code (tecla física) e não e.key: no Mac, Alt+[ vira "“" e Alt+] vira "‘" — code continua BracketLeft/Right.
-  // Captura (true) pra agir antes de qualquer handler da página; exige exatamente Cmd+Alt (sem Ctrl/Shift).
+  // (Idem Ctrl+Shift+R: e.code === 'KeyR' é robusto.) Captura (true) pra agir antes de qualquer handler da página.
   document.addEventListener('keydown', e => {
-    if (!(e.metaKey && e.altKey) || e.ctrlKey || e.shiftKey) return;
-    if (e.code === 'BracketRight') { e.preventDefault(); e.stopPropagation(); go(1); }
-    else if (e.code === 'BracketLeft') { e.preventDefault(); e.stopPropagation(); go(-1); }
+    // Trocar sessão: exige exatamente Cmd+Alt (sem Ctrl/Shift).
+    if (e.metaKey && e.altKey && !e.ctrlKey && !e.shiftKey) {
+      if (e.code === 'BracketRight') { e.preventDefault(); e.stopPropagation(); go(1); }
+      else if (e.code === 'BracketLeft') { e.preventDefault(); e.stopPropagation(); go(-1); }
+      return;
+    }
+    // Renomear: Ctrl+Shift+R (sem Cmd/Alt), SÓ no Mac. No Mac o reload nativo é Cmd+Shift+R (Ctrl+Shift+R fica livre);
+    // no Windows/Linux Ctrl+Shift+R é o hard-reload e o preventDefault em captura não o segura — então lá não capturamos.
+    if (isMac && e.ctrlKey && e.shiftKey && !e.metaKey && !e.altKey && e.code === 'KeyR') {
+      e.preventDefault(); e.stopPropagation(); rename();
+    }
   }, true);
 })();

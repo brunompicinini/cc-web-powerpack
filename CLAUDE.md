@@ -58,6 +58,8 @@ Fatos do DOM:
 ## scripts/session-switch-hotkey.user.js
 `Cmd+Alt+[` (anterior/cima) e `Cmd+Alt+]` (próxima/baixo) trocam a sessão aberta andando na lista da sidebar — réplica do `Cmd+Shift+[ / ]` do navegador Dia (que o Bruno não quis usar no Chrome porque já usa pra trocar de aba). Script mínimo: só um `keydown` em captura, sem painel/observer.
 
+`Ctrl+Shift+R` renomeia a sessão aberta (v1.1). Aciona clicando no título do header (`button.cursor-text` — mesma fonte que favicon/notepad usam): clicar nele abre o **input inline** do nome, focado e com o texto todo selecionado. Testado: o `.click()` sintético dispara o handler do React e abre o input; **não** existe atalho global nativo (o `R` do menu `⋮` é só acelerador do menu, não vale com o foco fora dele). **Só no Mac** (`isMac`): no Windows/Linux `Ctrl+Shift+R` é o hard-reload do navegador e o `preventDefault` em captura não o segura. **Sem guard de foco de propósito** — funciona mesmo digitando no prompt/notepad (rename de qualquer lugar é o objetivo).
+
 Fatos do DOM da sidebar (descobertos inspecionando a página) que o script depende:
 - A sidebar mistura **itens de menu** e **sessões**, ambos com `[data-row]`. Itens de menu (New session, Routines, Customize, More) são `<button data-row>` (a própria linha é o botão, sem botão interno). **Sessões** são `<div data-row>` com um `<button data-row-main-button>` dentro — esse main-button é o clicável que navega. Logo, sessões = `div[data-row]` que tem o main-button.
 - A ordem das linhas no DOM = a ordem visual, cruzando os grupos (Pinned/Desenvolvendo/Ideias/Waiting/Em Revisão) de cima pra baixo. `go(±1)` anda nessa lista achatada.

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Claude Code Web — Notepad por sessão
 // @namespace    bruno.uptide
-// @version      2.20
+// @version      2.21
 // @description  Painel lateral de notas por sessão no Claude Code Web (empurra o conteúdo, estilo Diff). Atalho Ctrl+Shift+S, redimensionável, links clicáveis. Nota salva por sessionId no localStorage.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
@@ -53,9 +53,14 @@
   let lastRendered = null; // ultimo texto renderizado no editor; blur so re-renderiza se mudou (preserva o caret ao trocar de aba sem editar)
   let lastMode = null, sidebarApplied = false; // controle do layout por modo (sessao vs home)
 
-  const escHtml = s => s.replace(/&/gu, '&amp;').replace(/</gu, '&lt;').replace(/>/gu, '&gt;');
-  // newline fica como \n literal (editor usa white-space: pre-wrap) -> round-trip idempotente
-  const linkify = t => escHtml(t || '').replace(/(?<url>https?:\/\/[^\s<]+)/gu, '<a href="$<url>" target="_blank" rel="noopener" style="color:' + ACCENT + ';text-decoration:underline">$<url></a>');
+  const escHtml = s => s.replace(/&/gu, '&amp;').replace(/</gu, '&lt;').replace(/>/gu, '&gt;').replace(/"/gu, '&quot;');
+  // newline fica como \n literal (editor usa white-space: pre-wrap) -> round-trip idempotente.
+  // a URL ja vem escapada por escHtml; tira a pontuacao final que normalmente nao faz parte do link
+  // (ex.: markdown "(url)." -> link "url" + texto ")."). O set exclui ';' pra nao cortar entidades (&amp; etc).
+  const linkify = t => escHtml(t || '').replace(/https?:\/\/[^\s<]+/gu, m => {
+    const u = m.replace(/[.,!?)\]}]+$/u, ''), tail = m.slice(u.length);
+    return '<a href="' + u + '" target="_blank" rel="noopener" style="color:' + ACCENT + ';text-decoration:underline">' + u + '</a>' + tail;
+  });
   const getText = () => editor.innerText.replace(/\u00a0/gu, ' ');
   const setText = t => { editor.innerHTML = linkify(t); lastRendered = t; };
   // versao atual lida do Tampermonkey (GM_info), com fallback caso indisponivel.
@@ -146,14 +151,16 @@
     editor.contentEditable = 'plaintext-only'; editor.spellcheck = false;
     editor.setAttribute('data-ph', 'Markdown notes for this session…');
     Object.assign(editor.style, { flex: '1', overflowY: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: BRIGHT, padding: '4px 18px 18px 18px', lineHeight: '1.55', outline: 'none' });
-    editor.addEventListener('input', () => { const id = sid(); if (!id) return; const val = getText(); clearTimeout(saveT); saveT = setTimeout(() => save(id, val), 300); });
+    // salva sob currentId (a sessao cuja nota esta carregada no editor), NAO sob sid() fresco: numa troca de sessao
+    // a URL pode mudar antes do syncSession recarregar, e sid() apontaria pra nova sessao -> gravaria o texto antigo nela.
+    editor.addEventListener('input', () => { const id = currentId; if (!id) return; const val = getText(); clearTimeout(saveT); saveT = setTimeout(() => save(id, val), 300); });
     // ao perder o foco (clicar fora), salva na hora e re-linkifica — sem precisar recolher/reabrir o painel.
     // seguro fora do 'input' pq sem caret nao ha risco de pular cursor / dobrar newline (linkify e round-trip idempotente).
     // so re-renderiza num blur "real" (foco indo pra outro elemento da MESMA pagina, document.hasFocus()===true).
     // se o documento perdeu o foco (troca de aba/janela, hasFocus===false), NAO reescreve o innerHTML -> o caret sobrevive ao voltar,
     // mesmo depois de editar. robusto a intermitencia do tab-switch: se o blur nao disparar, o DOM tambem fica intacto.
     // o linkify do que foi digitado fica pro proximo blur real / troca de sessao. (val !== lastRendered evita re-render redundante.)
-    editor.addEventListener('blur', () => { const id = sid(); const val = getText(); if (id) { clearTimeout(saveT); save(id, val); } if (val !== lastRendered && document.hasFocus()) setText(val); });
+    editor.addEventListener('blur', () => { const id = currentId; const val = getText(); if (id) { clearTimeout(saveT); save(id, val); } if (val !== lastRendered && document.hasFocus()) setText(val); });
     // clique num link SEMPRE abre (o editor fica focado por padrao, entao nao da pra exigir "fora de edicao").
     // pra editar o texto de um link, posicione o caret clicando fora dele / pelas setas.
     editor.addEventListener('mousedown', e => {
@@ -196,7 +203,10 @@
   // mostra "· nome" so em sessao; esconde o separador junto (display none tira tambem o gap, sem espaco sobrando depois do badge na home)
   function syncName() {
     if (!nameEl) return;
-    const n = sid() ? sessionName() : '';
+    const inSession = !!sid();
+    const n = inSession ? sessionName() : '';
+    // em sessao, ignora leitura vazia transitoria (durante o rename via Ctrl+Shift+R o button.cursor-text vira <input>) -> mantem o ultimo nome, sem piscar
+    if (inSession && !n) return;
     if (nameEl.textContent !== n) nameEl.textContent = n;
     const show = n ? '' : 'none';
     if (sepEl && sepEl.style.display !== show) sepEl.style.display = show;
@@ -237,7 +247,7 @@
     setInterval(tick, 1000);
     window.addEventListener('resize', () => { if (isOpen()) { const w = Math.min(getW(), window.innerWidth - 40); drawer.style.width = w + 'px'; squeeze(true, w); } });
     document.addEventListener('keydown', e => {
-      if (e.ctrlKey && e.shiftKey && (e.key === 'S' || e.key === 's')) { e.preventDefault(); e.stopPropagation(); toggle(); }
+      if (e.ctrlKey && e.shiftKey && e.code === 'KeyS') { e.preventDefault(); e.stopPropagation(); toggle(); } // e.code (tecla fisica): robusto em layout nao-latino
       else if (e.key === 'Escape' && isOpen()) setOpen(false);
     }, true);
     ['pushState', 'replaceState'].forEach(m => { const o = history[m]; history[m] = function reassigned(...args) { const r = o.apply(this, args); setTimeout(tick, 60); return r; }; });

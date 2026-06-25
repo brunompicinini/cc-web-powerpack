@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Claude Code Web — Session Status Favicon + Title
 // @namespace    bruno.uptide
-// @version      2.4
+// @version      2.5
 // @description  Favicon = status da sessão (verde=running, amarelo=awaiting input, azul=ready, roxo=merged), recolorindo o ícone real do Claude. Título da aba = nome da sessão.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
@@ -90,13 +90,17 @@
       k = 'default'; // home / lista => ícone original do Claude
     } else {
       const lbl = currentLabel();
-      if (lbl) k = KEY[lbl] || 'default';
+      if (lbl) k = KEY[norm(lbl)] || 'default'; // norm: o aria-label pode vir com espaco/zero-width e quebrar o lookup
       else if (currentMerged()) k = 'merged'; // sem status na linha + badge Merged => roxo
       else { if (lastKey) return; k = 'default'; } // sessão ainda carregando: mantém o último
     }
     if (k === lastKey) return;
-    lastKey = k;
-    if (cache[k] === undefined) cache[k] = await tint(k === 'default' ? null : COLORS[k]);
+    if (cache[k] === undefined) {
+      const data = await tint(k === 'default' ? null : COLORS[k]);
+      if (!data) return; // falha transitoria ao carregar o favicon.ico: NAO cacheia nem avanca lastKey -> tenta de novo no proximo tick
+      cache[k] = data;
+    }
+    lastKey = k; // so avanca depois de ter o icone em maos (evita travar num key cujo tint falhou / chegou fora de ordem)
     setFavicon(cache[k]);
   }
 
@@ -111,10 +115,16 @@
     const n = b && b.textContent.trim();
     return n || null;
   }
+  let lastSetTitle = null;
   function applyTitle() {
-    if (!onSessionPage()) return; // home: deixa o "Claude Code" do app
+    if (!onSessionPage()) {
+      // home: se o titulo ainda for o nome que NOS setamos (o app nao resetou), volta pro padrao.
+      // so age quando o titulo stale e exatamente o nosso -> se o app ja mexeu, nao entra em guerra.
+      if (lastSetTitle && document.title === lastSetTitle) { document.title = 'Claude Code'; lastSetTitle = null; }
+      return;
+    }
     const n = sessionName();
-    if (n && document.title !== n) document.title = n;
+    if (n && document.title !== n) { document.title = n; lastSetTitle = n; }
   }
 
   function applyAll() { applyFavicon(); applyTitle(); }
@@ -125,15 +135,19 @@
   let pend = false;
   const schedule = () => { if (pend) return; pend = true; setTimeout(() => { pend = false; applyAll(); }, 120); };
   const mo = new MutationObserver(schedule);
+  // No document-start o aside da sidebar e o header editavel ainda nao existem (o React monta depois), entao um observe()
+  // unico no start() nao pegava nada e so o poll de 1s agia. Ligamos de forma idempotente e re-tentamos no interval ate
+  // cada no aparecer. (O header vira <input> no rename; re-bind apos rename fica por conta do poll/title observer.)
+  const bound = { aside: false, hdr: false, title: false };
+  function bindObservers() {
+    if (!bound.aside) { const a = document.querySelector('aside.dframe-sidebar'); if (a) { mo.observe(a, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-label', 'data-selected'] }); bound.aside = true; } }
+    if (!bound.hdr) { const h = document.querySelector('button.cursor-text'); if (h) { mo.observe(h, { subtree: true, childList: true, characterData: true }); bound.hdr = true; } }
+    if (!bound.title) { const t = document.querySelector('title'); if (t) { mo.observe(t, { childList: true, characterData: true }); bound.title = true; } }
+  }
   function start() {
     if (!document.head) return setTimeout(start, 50);
-    const aside = document.querySelector('aside.dframe-sidebar');
-    if (aside) mo.observe(aside, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-label', 'data-selected'] });
-    const hdr = document.querySelector('button.cursor-text');
-    if (hdr) mo.observe(hdr, { subtree: true, childList: true, characterData: true });
-    const titleEl = document.querySelector('title');
-    if (titleEl) mo.observe(titleEl, { childList: true, characterData: true });
-    setInterval(applyAll, 1000);
+    bindObservers();
+    setInterval(() => { bindObservers(); applyAll(); }, 1000);
     ['pushState', 'replaceState'].forEach(m => {
       const o = history[m];
       history[m] = function () { const r = o.apply(this, arguments); setTimeout(applyAll, 60); return r; };
