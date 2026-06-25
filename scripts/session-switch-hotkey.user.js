@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Claude Code Web — Switch Session Hotkey (⌘⌥[ / ⌘⌥]) + Rename (⌃⇧R)
 // @namespace    bruno.uptide
-// @version      1.3
-// @description  Cmd+Alt+[ e Cmd+Alt+] trocam a sessão aberta (anda pra cima/baixo na lista da sidebar), igual o Cmd+Shift+[ / ] do navegador Dia. Funciona mesmo com a sidebar colapsada. Ctrl+Shift+R renomeia a sessão aberta (abre o input do título e seleciona o prefixo de tag [..] inteiro — ou tudo, se não houver tag — pronto pra digitar).
+// @version      1.4
+// @description  Cmd+Alt+[ e Cmd+Alt+] trocam a sessão aberta (anda pra cima/baixo na lista da sidebar), igual o Cmd+Shift+[ / ] do navegador Dia. Funciona mesmo com a sidebar colapsada. Ctrl+Shift+R renomeia a sessão aberta (abre o input do título e seleciona o texto dentro do prefixo [..], sem os colchetes — ou tudo, se não houver tag — pronto pra digitar).
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
 // @run-at       document-start
@@ -60,16 +60,16 @@
     if (!title) return;
     title.click();
     // O rename abre com TODO o nome selecionado. Se o nome tem prefixo de tag (começa com "["), reposiciona a
-    // seleção pro [..] inteiro — colchetes incluídos (ex.: "[ESPERAR VENDAS]") — pronto pra digitar a tag nova por
-    // cima. Sem tag, deixa a seleção total padrão (retoma o nome inteiro). Eventos de teclado sintéticos NÃO movem
-    // o caret; usamos a Selection API direto. O <input> aparece async (re-render do React), então re-tenta até ele
-    // focar. Testado ao vivo: setSelectionRange sobrevive ao re-render.
+    // seleção pro TEXTO DENTRO dos colchetes — SEM os "[" "]" (ex.: "[ESPERAR VENDAS]" => seleciona "ESPERAR VENDAS")
+    // — pronto pra digitar a tag nova por cima. Sem tag, deixa a seleção total padrão (retoma o nome inteiro).
+    // Eventos de teclado sintéticos NÃO movem o caret; usamos a Selection API direto. O <input> aparece async
+    // (re-render do React), então re-tenta até ele focar. Testado ao vivo: setSelectionRange sobrevive ao re-render.
     let tries = 12;
     const place = () => {
       const inp = document.activeElement;
       if (inp && inp.tagName === 'INPUT' && typeof inp.selectionStart === 'number') {
         const v = inp.value;
-        if (v[0] === '[') { const end = v.indexOf(']'); if (end !== -1) inp.setSelectionRange(0, end + 1); }
+        if (v[0] === '[') { const end = v.indexOf(']'); if (end !== -1) inp.setSelectionRange(1, end); }
       } else if (tries-- > 0) setTimeout(place, 30);
     };
     setTimeout(place, 0);
