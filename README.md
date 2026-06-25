@@ -12,6 +12,7 @@ Cada script fica em [`scripts/`](scripts/), termina em `.user.js` e instala dire
 | --- | --- |
 | [`session-status-favicon.user.js`](scripts/session-status-favicon.user.js) | Recolore o **favicon** da aba conforme o status da sessão aberta — 🟢 running, 🟡 awaiting input, 🔵 ready, 🟣 merged — e troca o **título da aba** pelo nome da sessão. |
 | [`session-notepad.user.js`](scripts/session-notepad.user.js) | **Notepad por sessão**: painel lateral de notas (empurra o conteúdo, estilo Diff). Atalho `Ctrl+Shift+S`, redimensionável, links clicáveis. Salva por `sessionId` no `localStorage`. |
+| [`session-switch-hotkey.user.js`](scripts/session-switch-hotkey.user.js) | **Trocar de sessão pelo teclado**: `Cmd+Alt+[` / `Cmd+Alt+]` andam pra cima/baixo na lista de sessões da sidebar (igual o `Cmd+Shift+[ / ]` do navegador Dia). Funciona mesmo com a sidebar colapsada. |
 
 ---
 
@@ -36,6 +37,8 @@ Abra a **raw URL** de cada script (termina em `.user.js`) e o Tampermonkey inter
   `https://raw.githubusercontent.com/brunompicinini/cc-web-powerpack/main/scripts/session-status-favicon.user.js`
 - **Session Notepad** →
   `https://raw.githubusercontent.com/brunompicinini/cc-web-powerpack/main/scripts/session-notepad.user.js`
+- **Switch Session Hotkey** →
+  `https://raw.githubusercontent.com/brunompicinini/cc-web-powerpack/main/scripts/session-switch-hotkey.user.js`
 
 Clique em **Install**. Pronto.
 

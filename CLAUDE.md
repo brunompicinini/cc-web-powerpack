@@ -55,6 +55,17 @@ Fatos do DOM:
 - A barra onde o botão é injetado é achada por `button[aria-label="Share"|"Session actions"|"Diff"]`, subindo pro `span.epitaxy-titlebar-fade` (ou parent).
 - O conteúdo principal que é "empurrado" pelo painel é `#dframe-main` (ajusta `style.right`).
 
+## scripts/session-switch-hotkey.user.js
+`Cmd+Alt+[` (anterior/cima) e `Cmd+Alt+]` (próxima/baixo) trocam a sessão aberta andando na lista da sidebar — réplica do `Cmd+Shift+[ / ]` do navegador Dia (que o Bruno não quis usar no Chrome porque já usa pra trocar de aba). Script mínimo: só um `keydown` em captura, sem painel/observer.
+
+Fatos do DOM da sidebar (descobertos inspecionando a página) que o script depende:
+- A sidebar mistura **itens de menu** e **sessões**, ambos com `[data-row]`. Itens de menu (New session, Routines, Customize, More) são `<button data-row>` (a própria linha é o botão, sem botão interno). **Sessões** são `<div data-row>` com um `<button data-row-main-button>` dentro — esse main-button é o clicável que navega. Logo, sessões = `div[data-row]` que tem o main-button.
+- A ordem das linhas no DOM = a ordem visual, cruzando os grupos (Pinned/Desenvolvendo/Ideias/Waiting/Em Revisão) de cima pra baixo. `go(±1)` anda nessa lista achatada.
+- **Sessão aberta (âncora):** a linha aberta carrega `data-selected` (valor `"focused"`, às vezes `"open"` — ver as classes `data-[selected=focused]` / `data-[selected=open]`). É **só uma** por vez e acompanha a route — confirmado no load fresco da página e após cada troca. Na home nenhuma linha de **sessão** tem `data-selected` (o foco roving fica no `New session`, que é botão de menu) → `currentIdx` = -1, e aí `]` abre a 1ª / `[` abre a última.
+- **Navega via `.click()` no main-button** (dispara o router do React). **Funciona com a sidebar COLAPSADA** (28px): as linhas seguem no DOM, mantêm `data-selected` e rect real; o clique sintético ignora o clipping visual. Isso importa porque o notepad colapsa a sidebar em modo sessão.
+- **Tecla:** usar `e.code` (`BracketLeft`/`BracketRight`, tecla física) e **não** `e.key` — no Mac, `Alt+[` vira `"` e `Alt+]` vira `'`, mas o `code` continua Bracket*. Exige exatamente `metaKey && altKey` (sem Ctrl/Shift). `Cmd+Alt+[ / ]` não é atalho nativo do Chrome (Mac), então não há conflito.
+- Limitação aceita: sessões que não estejam no DOM (grupo colapsado / virtualização com lista muito grande) ficam fora do ciclo. Para as listas atuais (~10-15) todas estão renderizadas.
+
 ## Testar/lintar
 - Não é um projeto Node; não há build. Edição manual do `.user.js`.
 - Lint opcional com ESLint (flat config), regras de formatação + `no-undef` com globals de browser. Globals usados: `window, document, location, localStorage, history, setTimeout, setInterval, clearTimeout, MutationObserver, Image, addEventListener, Promise`. Notepad também usa `GM_openInTab` e `GM_info` (Tampermonkey).
