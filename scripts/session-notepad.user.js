@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Claude Code Web — Notepad por sessão
 // @namespace    bruno.uptide
-// @version      2.21
+// @version      2.22
 // @description  Painel lateral de notas por sessão no Claude Code Web (empurra o conteúdo, estilo Diff). Atalho Ctrl+Shift+S, redimensionável, links clicáveis. Nota salva por sessionId no localStorage.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
@@ -248,7 +248,7 @@
     window.addEventListener('resize', () => { if (isOpen()) { const w = Math.min(getW(), window.innerWidth - 40); drawer.style.width = w + 'px'; squeeze(true, w); } });
     document.addEventListener('keydown', e => {
       if (e.ctrlKey && e.shiftKey && e.code === 'KeyS') { e.preventDefault(); e.stopPropagation(); toggle(); } // e.code (tecla fisica): robusto em layout nao-latino
-      else if (e.key === 'Escape' && isOpen()) setOpen(false);
+      // Esc NAO fecha o painel de proposito: o Bruno usa Esc pra outras coisas e nao quer que recolha as notas sem querer.
     }, true);
     ['pushState', 'replaceState'].forEach(m => { const o = history[m]; history[m] = function reassigned(...args) { const r = o.apply(this, args); setTimeout(tick, 60); return r; }; });
     addEventListener('popstate', () => setTimeout(tick, 60));

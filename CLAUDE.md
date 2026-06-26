@@ -36,7 +36,7 @@ Fatos do DOM do Claude Code Web (descobertos inspecionando a página) que o scri
 Recolorir o favicon: carrega `claude.ai/favicon.ico` (mesma origem → canvas não "tainta"), desenha num canvas e usa `globalCompositeOperation = 'source-in'` pra trocar a cor mantendo a forma. Cada cor é gerada 1x e fica em cache.
 
 ## scripts/session-notepad.user.js
-Painel lateral de notas por sessão. Atalho `Ctrl+Shift+S` (ou botão injetado na barra de ações), `Esc` fecha. Redimensionável (largura salva em `localStorage` key `cc-notes:w`, padrão 750px).
+Painel lateral de notas por sessão. Atalho `Ctrl+Shift+S` (ou botão injetado na barra de ações) — toggle. `Esc` **não** fecha (de propósito, v2.22: o Bruno usa `Esc` pra outras coisas e não quer recolher as notas sem querer — fechar é via `×`, botão ou `Ctrl+Shift+S`). Redimensionável (largura salva em `localStorage` key `cc-notes:w`, padrão 750px).
 
 **Template padrão:** sessão ainda sem nota salva abre com o template `# STATUS` / `# PRs` / `# CLICKUP` / `# LINKS` / `# NOTES` (const `TEMPLATE`, via `loadNote()` = `load(id) || TEMPLATE`). É só exibição — não grava no `localStorage` até o usuário editar (o `input`/`blur` salva o que estiver no editor). Nota vazia (nunca salva ou esvaziada) reexibe o template.
 
