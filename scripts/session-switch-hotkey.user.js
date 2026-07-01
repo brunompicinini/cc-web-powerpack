@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Claude Code Web — Switch Session Hotkey (⌘⌥[ / ⌘⌥]) + Rename (⌃⇧R)
+// @name         Claude Code Web — Switch Session Hotkey (⌘⌥[ / ⌘⌥]) + Rename (⌃⇧R) + Usage (⌃⇧C)
 // @namespace    bruno.uptide
-// @version      1.4
-// @description  Cmd+Alt+[ e Cmd+Alt+] trocam a sessão aberta (anda pra cima/baixo na lista da sidebar), igual o Cmd+Shift+[ / ] do navegador Dia. Funciona mesmo com a sidebar colapsada. Ctrl+Shift+R renomeia a sessão aberta (abre o input do título e seleciona o texto dentro do prefixo [..], sem os colchetes — ou tudo, se não houver tag — pronto pra digitar).
+// @version      1.5
+// @description  Cmd+Alt+[ e Cmd+Alt+] trocam a sessão aberta (anda pra cima/baixo na lista da sidebar), igual o Cmd+Shift+[ / ] do navegador Dia. Funciona mesmo com a sidebar colapsada. Ctrl+Shift+R renomeia a sessão aberta (abre o input do título e seleciona o texto dentro do prefixo [..], sem os colchetes — ou tudo, se não houver tag — pronto pra digitar). Ctrl+Shift+C abre/fecha o painel de uso do plano (Plan usage / limites / créditos).
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
 // @run-at       document-start
@@ -75,6 +75,15 @@
     setTimeout(place, 0);
   }
 
+  // Abre/fecha o painel de uso do plano (Plan usage / 5-hour limit / Weekly / Usage credits). É o botão nativo
+  // no canto inferior direito, ao lado de "Opus 4.8"/effort — identificado por aria-label que começa com "Usage:"
+  // (o label carrega o %, ex.: "Usage: plan 46%", por isso o prefixo). O .click() é toggle (abre e fecha). Existe
+  // tanto na home quanto em sessão, então não precisa de guard de sessão.
+  function usage() {
+    const btn = document.querySelector('button[aria-label^="Usage:"]');
+    if (btn) btn.click();
+  }
+
   // e.code (tecla física) e não e.key: no Mac, Alt+[ vira "“" e Alt+] vira "‘" — code continua BracketLeft/Right.
   // (Idem Ctrl+Shift+R: e.code === 'KeyR' é robusto.) Captura (true) pra agir antes de qualquer handler da página.
   document.addEventListener('keydown', e => {
@@ -88,6 +97,11 @@
     // no Windows/Linux Ctrl+Shift+R é o hard-reload e o preventDefault em captura não o segura — então lá não capturamos.
     if (isMac && e.ctrlKey && e.shiftKey && !e.metaKey && !e.altKey && e.code === 'KeyR') {
       e.preventDefault(); e.stopPropagation(); rename();
+    }
+    // Painel de uso do plano: Ctrl+Shift+C (sem Cmd/Alt), SÓ no Mac. No Win/Linux Ctrl+Shift+C abre o inspetor do
+    // DevTools e o preventDefault em captura não o segura — então lá não capturamos (mesmo motivo do rename).
+    if (isMac && e.ctrlKey && e.shiftKey && !e.metaKey && !e.altKey && e.code === 'KeyC') {
+      e.preventDefault(); e.stopPropagation(); usage();
     }
   }, true);
 })();
