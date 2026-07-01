@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Claude Code Web — Notepad por sessão
 // @namespace    bruno.uptide
-// @version      2.22
+// @version      2.23
 // @description  Painel lateral de notas por sessão no Claude Code Web (empurra o conteúdo, estilo Diff). Atalho Ctrl+Shift+S, redimensionável, links clicáveis. Nota salva por sessionId no localStorage.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
@@ -71,7 +71,10 @@
   // nome do chat = header editavel do Claude (button.cursor-text), inclui o prefixo [id]. Mesma fonte que o script do favicon usa.
   const sessionName = () => { const b = document.querySelector('button.cursor-text'); return b ? (b.textContent || '').trim() : ''; };
 
-  function squeeze(on, w) { const m = document.getElementById('dframe-main'); if (m) m.style.right = on ? (w + 'px') : ''; }
+  // Empurra o conteudo principal pra abrir espaco pro painel (ajusta style.right). O Claude Code Web renomeou o
+  // container de id #dframe-main pra <main class="dframe-content"> (mesma pegada: position:absolute; left:0; right:0;
+  // setar right encolhe a largura). Tenta o id antigo primeiro (caso revertam) e cai pro novo. Sem ele o painel fica por cima.
+  function squeeze(on, w) { const m = document.getElementById('dframe-main') || document.querySelector('main.dframe-content'); if (m) m.style.right = on ? (w + 'px') : ''; }
 
   function buildDrawer() {
     if (document.getElementById(DRAWER_ID)) return;

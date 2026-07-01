@@ -54,7 +54,7 @@ O **handle de resize** (pill) fica escondido (`opacity: 0`) e só aparece no hov
 Fatos do DOM:
 - `sessionId` vem do path: `/session_[A-Za-z0-9]+/`.
 - A barra onde o botão é injetado é achada por `button[aria-label="Share"|"Session actions"|"Diff"]`, subindo pro `span.epitaxy-titlebar-fade` (ou parent).
-- O conteúdo principal que é "empurrado" pelo painel é `#dframe-main` (ajusta `style.right`).
+- O conteúdo principal que é "empurrado" pelo painel é `main.dframe-content` (ajusta `style.right`) — o `squeeze()` tenta o id antigo `#dframe-main` primeiro e cai pro novo. **Mudança do app (jul/2026):** o Claude Code Web trocou o id `#dframe-main` pela classe `<main class="dframe-content">` (mesma pegada `position:absolute; left:0; right:0`; setar `right` encolhe a largura). Sem o fallback o painel ficava **por cima** do conteúdo em vez de encaixar do lado (v2.23). O resto dos hooks (`aside.dframe-sidebar`, `dframe-store`, botões `Open/Collapse sidebar`) seguiu igual.
 
 ## scripts/session-switch-hotkey.user.js
 `Cmd+Alt+[` (anterior/cima) e `Cmd+Alt+]` (próxima/baixo) trocam a sessão aberta andando na lista da sidebar — réplica do `Cmd+Shift+[ / ]` do navegador Dia (que o Bruno não quis usar no Chrome porque já usa pra trocar de aba). Script mínimo: só um `keydown` em captura, sem painel/observer.
