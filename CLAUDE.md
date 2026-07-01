@@ -19,6 +19,7 @@ Repo público: `brunompicinini/cc-web-powerpack`, branch default `main`.
 - **Auto‑update:** `@downloadURL` e `@updateURL` apontam para a raw de `main`:
   `https://raw.githubusercontent.com/brunompicinini/cc-web-powerpack/main/scripts/<arquivo>.user.js`
 - **Toda mudança publicada exige subir o `@version`** — é o gatilho do auto‑update do Tampermonkey.
+- **NÃO mude o `@name` entre versões.** O Tampermonkey usa `@name` (+`@namespace`) como **identidade** do script. Se o `@name` muda, o reinstall manual pela raw mostra **"Install"** (script novo/duplicado) em vez de **"Update"** — e aí o antigo continua instalado rodando junto. O auto‑update em background atualiza in‑place mesmo com nome novo, mas o fluxo documentado de "testar na hora" (reinstalar pela raw) quebra. Por isso: features novas vão só no `@description` (mudança livre, o TM não casa por ela), **nunca** no `@name`. Se precisar mudar o `@name`, aceite que vira reinstall + apagar o antigo na mão.
 - Filename e a parte final das URLs raw têm que bater (senão o auto‑update quebra).
 - Cuidado com caracteres invisíveis usados de propósito nos regex (zero-width `​-‍﻿` no favicon; nbsp ` ` no notepad). Não "limpar" sem querer.
 

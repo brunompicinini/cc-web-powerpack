@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Claude Code Web — Switch Session Hotkey (⌘⌥[ / ⌘⌥]) + Rename (⌃⇧R) + Usage (⌃⇧C)
+// @name         Claude Code Web — Switch Session Hotkey (⌘⌥[ / ⌘⌥]) + Rename (⌃⇧R)
 // @namespace    bruno.uptide
-// @version      1.5
+// @version      1.6
 // @description  Cmd+Alt+[ e Cmd+Alt+] trocam a sessão aberta (anda pra cima/baixo na lista da sidebar), igual o Cmd+Shift+[ / ] do navegador Dia. Funciona mesmo com a sidebar colapsada. Ctrl+Shift+R renomeia a sessão aberta (abre o input do título e seleciona o texto dentro do prefixo [..], sem os colchetes — ou tudo, se não houver tag — pronto pra digitar). Ctrl+Shift+C abre/fecha o painel de uso do plano (Plan usage / limites / créditos).
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
