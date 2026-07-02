@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Claude Code Web — Notepad por sessão
 // @namespace    bruno.uptide
-// @version      2.24
-// @description  Painel lateral de notas por sessão no Claude Code Web (painel flutuante com fundo próprio e cantos arredondados, igual aos painéis nativos; slide-in ao abrir). Atalho Ctrl+Shift+S, redimensionável, links clicáveis. Nota salva por sessionId no localStorage.
+// @version      2.25
+// @description  Painel lateral de notas por sessão no Claude Code Web (painel flutuante com fundo próprio e cantos arredondados, igual aos painéis nativos; slide-in com a MESMA spring do framer-motion do app, medida quadro a quadro). Atalho Ctrl+Shift+S, redimensionável, links clicáveis. Nota salva por sessionId no localStorage.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
 // @run-at       document-start
@@ -30,9 +30,14 @@
   // fundo proprio elevado (surface-primary-elevated = rgb(38,38,38), != rgb(31,31,30) do body), cantos 8px,
   // recuo de 9px das bordas da janela e 12px de gap entre o conteudo e o painel (RESERVE = 9+12).
   const PANEL_BG = 'rgb(38,38,38)', RADIUS = 8, EDGE = 9, SPLIT = 12, RESERVE = EDGE + SPLIT;
-  // slide: entra da direita p/ esquerda (rapido, <=0.5s) e sai da esquerda p/ direita (mais rapido ainda).
-  const ENTER_MS = 280, EXIT_MS = 130;
-  const ENTER_EASE = 'cubic-bezier(0.16,1,0.3,1)', EXIT_EASE = 'cubic-bezier(0.4,0,1,1)';
+  // Slide: a MESMA spring do framer-motion que os paineis nativos do app usam (Background tasks etc.), medida no app
+  // quadro a quadro (translateX 100%->0: velocidade baixa no inicio, pico no meio, cauda longa assintotica). Reproduzida
+  // fielmente com easing linear() (pontos = progresso normalizado medido), ~300ms. Enter e exit usam a MESMA spring
+  // (o nativo e simetrico); no exit a cauda lenta fica fora da tela (painel ja saiu), entao "parece" mais rapido — igual
+  // a percepcao no nativo. (Nada de cubic-bezier chutado: cubic-bezier nao reproduz a cauda da spring.)
+  const SPRING_MS = 300;
+  const SPRING = 'linear(0, 0.074 5.4%, 0.192 10.7%, 0.359 16.4%, 0.471 19.1%, 0.576 21.8%, 0.665 24.8%, 0.741 27.5%, 0.79 30.2%, 0.857 35.9%, 0.896 41.6%, 0.925 47%, 0.943 52.7%, 0.965 61.1%, 0.976 66.4%, 0.986 74.8%, 0.994 86.2%, 1 100%)';
+  const SPRING_TR = 'transform ' + SPRING_MS + 'ms ' + SPRING;
   const HIDDEN_TX = 'translateX(calc(100% + 24px))'; // fora da tela pra direita (o +24 cobre o inset de 9px + o handle)
 
   // template padrao pra notas novas (sessao ainda sem nota salva) — exibido, salva so quando o usuario editar
@@ -198,17 +203,17 @@
       clearTimeout(closeT); openState = true;
       const id = sid(); currentId = id; const w = getW();
       drawer.style.width = w + 'px'; setText(id ? loadNote(id) : ''); squeeze(true, w);
-      // slide-in: parte fora da tela (a direita) sem animar, forca reflow, e desliza pra posicao com ENTER_MS.
+      // slide-in: parte fora da tela (a direita) sem animar, forca reflow, e desliza pra posicao com a spring nativa.
       drawer.style.transition = 'none'; drawer.style.transform = HIDDEN_TX; drawer.style.display = 'flex';
       void drawer.offsetWidth;
-      drawer.style.transition = 'transform ' + ENTER_MS + 'ms ' + ENTER_EASE; drawer.style.transform = 'translateX(0)';
+      drawer.style.transition = SPRING_TR; drawer.style.transform = 'translateX(0)';
       if (focus) editor.focus();
     } else {
       openState = false;
       // slide-out: o conteudo volta ja (squeeze off) e o painel desliza pra fora POR CIMA (revela o conteudo, sem "pulo").
       squeeze(false);
-      drawer.style.transition = 'transform ' + EXIT_MS + 'ms ' + EXIT_EASE; drawer.style.transform = HIDDEN_TX;
-      clearTimeout(closeT); closeT = setTimeout(() => { drawer.style.display = 'none'; }, EXIT_MS + 40);
+      drawer.style.transition = SPRING_TR; drawer.style.transform = HIDDEN_TX;
+      clearTimeout(closeT); closeT = setTimeout(() => { drawer.style.display = 'none'; }, SPRING_MS + 60);
     }
     syncBtnColor();
   }
