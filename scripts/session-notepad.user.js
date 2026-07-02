@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Claude Code Web — Notepad por sessão
 // @namespace    bruno.uptide
-// @version      2.25
+// @version      2.26
 // @description  Painel lateral de notas por sessão no Claude Code Web (painel flutuante com fundo próprio e cantos arredondados, igual aos painéis nativos; slide-in com a MESMA spring do framer-motion do app, medida quadro a quadro). Atalho Ctrl+Shift+S, redimensionável, links clicáveis. Nota salva por sessionId no localStorage.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
@@ -28,8 +28,12 @@
   const MINW = 300, DEFW = 750; // largura padrao 750px; sem teto fixo (limita so a janela)
   // Estilo "painel flutuante" igual aos paineis nativos do Claude Code Web (Background tasks etc.):
   // fundo proprio elevado (surface-primary-elevated = rgb(38,38,38), != rgb(31,31,30) do body), cantos 8px,
-  // recuo de 9px das bordas da janela e 12px de gap entre o conteudo e o painel (RESERVE = 9+12).
-  const PANEL_BG = 'rgb(38,38,38)', RADIUS = 8, EDGE = 9, SPLIT = 12, RESERVE = EDGE + SPLIT;
+  // recuo de 9px das bordas da janela (EDGE). O gap visivel entre a barra de acoes/conteudo e o painel e 12px (igual ao
+  // nativo) — mas NAO reservamos 12px de folga: a barra de icones ja tem ~13px de padding propria dentro do main, entao
+  // o box do conteudo fica RENTE ao painel e essa padding vira o gap (o nativo faz igual: main full-width sob o painel).
+  // Medido ao vivo: com main.right = w + 8 a barra fica exatamente 12px do painel, identico ao nativo. Dai RESERVE = 8
+  // (reservar EDGE+12 = 21, como antes, empurrava a barra 13px a mais e o gap dava 25px, longe do nativo).
+  const PANEL_BG = 'rgb(38,38,38)', RADIUS = 8, EDGE = 9, RESERVE = 8;
   // Slide: a MESMA spring do framer-motion que os paineis nativos do app usam (Background tasks etc.), medida no app
   // quadro a quadro (translateX 100%->0: velocidade baixa no inicio, pico no meio, cauda longa assintotica). Reproduzida
   // fielmente com easing linear() (pontos = progresso normalizado medido), ~300ms. Enter e exit usam a MESMA spring
@@ -88,7 +92,7 @@
   // Empurra o conteudo principal pra abrir espaco pro painel (ajusta style.right). O Claude Code Web renomeou o
   // container de id #dframe-main pra <main class="dframe-content"> (mesma pegada: position:absolute; left:0; right:0;
   // setar right encolhe a largura). Tenta o id antigo primeiro (caso revertam) e cai pro novo. Sem ele o painel fica por cima.
-  // reserva w + RESERVE (largura do painel + gap direito + gap entre painel e conteudo) pra o painel flutuante nao cobrir o conteudo.
+  // reserva w + RESERVE no main (RESERVE=8, medido: deixa a barra de acoes 12px do painel, igual ao nativo — ver constantes).
   function squeeze(on, w) { const m = document.getElementById('dframe-main') || document.querySelector('main.dframe-content'); if (m) m.style.right = on ? (w + RESERVE + 'px') : ''; }
 
   function buildDrawer() {
