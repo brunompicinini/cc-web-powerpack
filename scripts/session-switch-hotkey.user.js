@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Claude Code Web — Switch Session Hotkey (⌘⌥[ / ⌘⌥]) + Rename (⌃⇧R)
 // @namespace    bruno.uptide
-// @version      1.7
-// @description  Cmd+Alt+[ e Cmd+Alt+] trocam a sessão aberta (anda pra cima/baixo na lista da sidebar), igual o Cmd+Shift+[ / ] do navegador Dia. Funciona mesmo com a sidebar colapsada. Ctrl+Shift+R renomeia a sessão aberta (abre o input do título e seleciona o texto dentro do prefixo [..], sem os colchetes — ou tudo, se não houver tag — pronto pra digitar). Ctrl+Shift+C abre/fecha o painel de uso do plano (Plan usage / limites / créditos). Ctrl+Shift+B abre/fecha o painel Background tasks.
+// @version      1.8
+// @description  Cmd+Alt+[ e Cmd+Alt+] trocam a sessão aberta (anda pra cima/baixo na lista da sidebar), igual o Cmd+Shift+[ / ] do navegador Dia. Funciona mesmo com a sidebar colapsada. Ctrl+Shift+R renomeia a sessão aberta (abre o input do título e seleciona o texto dentro do prefixo [..], sem os colchetes — ou tudo, se não houver tag — pronto pra digitar). Ctrl+Shift+C abre/fecha o painel de uso do plano (Plan usage / limites / créditos). Ctrl+Shift+B abre/fecha o painel Background tasks e Ctrl+Shift+A o painel Artifacts (ambos viraram itens do menu ⋮ Session actions).
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
 // @run-at       document-start
@@ -84,13 +84,38 @@
     if (btn) btn.click();
   }
 
-  // Abre/fecha o painel "Background tasks" (o trabalho em background da sessao). E o botao nativo da barra de acoes,
-  // identificado por aria-label que contem "background task" (i) — o label carrega o estado/contagem, ex.:
-  // "1 background task running" / "2 background tasks running" / "Background tasks", por isso o match por substring
-  // case-insensitive (cobre singular/plural e title-case). O .click() e toggle (abre e fecha). So aparece em sessao.
-  function backgroundTasks() {
-    const btn = document.querySelector('button[aria-label*="background task" i]');
-    if (btn) btn.click();
+  // Abre/fecha um painel que virou item do menu "Session actions" (o ⋮ da barra de acoes). Mudanca do app
+  // (jul/2026): "Artifacts" e "Background tasks" NAO sao mais botoes diretos da barra — agora sao itens
+  // role="menuitemcheckbox" DENTRO desse menu (por isso o antigo lookup por aria-label do botao parou de achar).
+  // Fluxo: abre o menu (click no trigger "Session actions"), acha o item VISIVEL pelo texto e clica (o .click()
+  // dispara o toggle do painel no React). Depois fecha o menu: o menuitemcheckbox do Radix NAO fecha o menu ao
+  // selecionar, entao re-clicamos o trigger se ele seguir expandido.
+  // Sinais/pegadinhas descobertos inspecionando ao vivo:
+  //  - Estado aberto/fechado = aria-expanded do trigger. Existe um [role="menu"] PERSISTENTE escondido no DOM
+  //    (forceMount do Radix), entao checar a existencia do menu enganaria (sempre "aberto"); aria-expanded reflete
+  //    o estado visual real.
+  //  - O item so fica montado no DOM enquanto o menu esta aberto (desmonta ao fechar), por isso o poll com retry
+  //    apos abrir o menu — e o offsetParent no findItem garante pegar o item VISIVEL, nao um residual escondido.
+  //  - Escape/click-fora sinteticos NAO fecham o menu do Radix (ele ouve eventos reais do SO); re-clicar o trigger
+  //    fecha de forma confiavel.
+  function togglePanel(labelRe) {
+    const trigger = document.querySelector('button[aria-label="Session actions"]');
+    if (!trigger) return;
+    const isOpen = () => trigger.getAttribute('aria-expanded') === 'true';
+    const findItem = () => [...document.querySelectorAll('[role="menuitemcheckbox"]')]
+      .find(e => e.offsetParent && labelRe.test((e.textContent || '').trim()));
+    if (!isOpen()) trigger.click();
+    let tries = 25;
+    const step = () => {
+      const it = findItem();
+      if (it) {
+        it.click();
+        setTimeout(() => { if (trigger.getAttribute('aria-expanded') === 'true') trigger.click(); }, 80);
+        return;
+      }
+      if (tries-- > 0) setTimeout(step, 25);
+    };
+    setTimeout(step, isOpen() ? 0 : 40);
   }
 
   // e.code (tecla física) e não e.key: no Mac, Alt+[ vira "“" e Alt+] vira "‘" — code continua BracketLeft/Right.
@@ -115,7 +140,12 @@
     // Painel Background tasks: Ctrl+Shift+B (sem Cmd/Alt), SO no Mac. No Win/Linux Ctrl+Shift+B alterna a barra de
     // favoritos do Chrome e o preventDefault em captura nao o segura — entao la nao capturamos (mesmo motivo do rename/usage).
     if (isMac && e.ctrlKey && e.shiftKey && !e.metaKey && !e.altKey && e.code === 'KeyB') {
-      e.preventDefault(); e.stopPropagation(); backgroundTasks();
+      e.preventDefault(); e.stopPropagation(); togglePanel(/^Background tasks$/i);
+    }
+    // Painel Artifacts: Ctrl+Shift+A (sem Cmd/Alt), SO no Mac. No Mac o select-all e Cmd+A (Ctrl+Shift+A fica livre);
+    // no Win/Linux Ctrl+Shift+A abre a busca de abas do Chrome e o preventDefault em captura nao o segura — entao la nao capturamos.
+    if (isMac && e.ctrlKey && e.shiftKey && !e.metaKey && !e.altKey && e.code === 'KeyA') {
+      e.preventDefault(); e.stopPropagation(); togglePanel(/^Artifacts$/i);
     }
   }, true);
 })();
