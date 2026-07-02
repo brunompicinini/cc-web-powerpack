@@ -11,8 +11,8 @@ Cada script fica em [`scripts/`](scripts/), termina em `.user.js` e instala dire
 | Script | O que faz |
 | --- | --- |
 | [`session-status-favicon.user.js`](scripts/session-status-favicon.user.js) | Recolore o **favicon** da aba conforme o status da sessão aberta — 🟢 running, 🟡 awaiting input, 🔵 ready, 🟣 merged — e troca o **título da aba** pelo nome da sessão. |
-| [`session-notepad.user.js`](scripts/session-notepad.user.js) | **Notepad por sessão**: painel lateral de notas (empurra o conteúdo, estilo Diff). Atalho `Ctrl+Shift+S`, redimensionável, links clicáveis. Salva por `sessionId` no `localStorage`. |
-| [`session-switch-hotkey.user.js`](scripts/session-switch-hotkey.user.js) | **Trocar de sessão pelo teclado**: `Cmd+Alt+[` / `Cmd+Alt+]` andam pra cima/baixo na lista de sessões da sidebar (igual o `Cmd+Shift+[ / ]` do navegador Dia). Funciona mesmo com a sidebar colapsada. |
+| [`session-notepad.user.js`](scripts/session-notepad.user.js) | **Notepad por sessão**: painel lateral **flutuante** de notas (fundo próprio, cantos arredondados e slide-in — igual aos painéis nativos). Atalho `Ctrl+Shift+S`, redimensionável, links clicáveis. Salva por `sessionId` no `localStorage`. |
+| [`session-switch-hotkey.user.js`](scripts/session-switch-hotkey.user.js) | **Trocar de sessão + atalhos**: `Cmd+Alt+[` / `Cmd+Alt+]` andam pra cima/baixo na lista de sessões da sidebar (igual o `Cmd+Shift+[ / ]` do navegador Dia), mesmo com a sidebar colapsada. Também (só Mac): `Ctrl+Shift+R` renomeia a sessão, `Ctrl+Shift+C` abre o uso do plano, `Ctrl+Shift+B` abre o Background tasks. |
 
 ---
 

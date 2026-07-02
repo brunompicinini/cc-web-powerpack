@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Claude Code Web — Notepad por sessão
 // @namespace    bruno.uptide
-// @version      2.23
-// @description  Painel lateral de notas por sessão no Claude Code Web (empurra o conteúdo, estilo Diff). Atalho Ctrl+Shift+S, redimensionável, links clicáveis. Nota salva por sessionId no localStorage.
+// @version      2.24
+// @description  Painel lateral de notas por sessão no Claude Code Web (painel flutuante com fundo próprio e cantos arredondados, igual aos painéis nativos; slide-in ao abrir). Atalho Ctrl+Shift+S, redimensionável, links clicáveis. Nota salva por sessionId no localStorage.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
 // @run-at       document-start
@@ -26,6 +26,14 @@
   const MUTED = 'rgba(255,255,255,0.55)', BRIGHT = 'hsl(60 14% 97%)';
   const ACCENT = '#0099ff'; // azul do botão ativo + links (igual ao Claude Code Web)
   const MINW = 300, DEFW = 750; // largura padrao 750px; sem teto fixo (limita so a janela)
+  // Estilo "painel flutuante" igual aos paineis nativos do Claude Code Web (Background tasks etc.):
+  // fundo proprio elevado (surface-primary-elevated = rgb(38,38,38), != rgb(31,31,30) do body), cantos 8px,
+  // recuo de 9px das bordas da janela e 12px de gap entre o conteudo e o painel (RESERVE = 9+12).
+  const PANEL_BG = 'rgb(38,38,38)', RADIUS = 8, EDGE = 9, SPLIT = 12, RESERVE = EDGE + SPLIT;
+  // slide: entra da direita p/ esquerda (rapido, <=0.5s) e sai da esquerda p/ direita (mais rapido ainda).
+  const ENTER_MS = 280, EXIT_MS = 130;
+  const ENTER_EASE = 'cubic-bezier(0.16,1,0.3,1)', EXIT_EASE = 'cubic-bezier(0.4,0,1,1)';
+  const HIDDEN_TX = 'translateX(calc(100% + 24px))'; // fora da tela pra direita (o +24 cobre o inset de 9px + o handle)
 
   // template padrao pra notas novas (sessao ainda sem nota salva) — exibido, salva so quando o usuario editar
   const TEMPLATE = '# STATUS\n\n\n# PRs\n\n\n# CLICKUP\n\n\n# LINKS\n\n\n# NOTES';
@@ -49,7 +57,8 @@
   st.textContent = '#cc-notes-editor:empty:before{content:attr(data-ph);color:rgba(255,255,255,0.3);pointer-events:none;}#cc-notes-editor a{color:' + ACCENT + ';text-decoration:underline;cursor:pointer;}#cc-notes-editor:focus{outline:none;}';
   (document.head || document.documentElement).appendChild(st);
 
-  let drawer = null, editor = null, currentId = null, saveT = null, btnRef = null, nameEl = null, sepEl = null;
+  let drawer = null, col = null, editor = null, currentId = null, saveT = null, btnRef = null, nameEl = null, sepEl = null;
+  let openState = false, closeT = null; // estado logico do painel (independe do display: robusto durante o slide de saida)
   let lastRendered = null; // ultimo texto renderizado no editor; blur so re-renderiza se mudou (preserva o caret ao trocar de aba sem editar)
   let lastMode = null, sidebarApplied = false; // controle do layout por modo (sessao vs home)
 
@@ -74,16 +83,17 @@
   // Empurra o conteudo principal pra abrir espaco pro painel (ajusta style.right). O Claude Code Web renomeou o
   // container de id #dframe-main pra <main class="dframe-content"> (mesma pegada: position:absolute; left:0; right:0;
   // setar right encolhe a largura). Tenta o id antigo primeiro (caso revertam) e cai pro novo. Sem ele o painel fica por cima.
-  function squeeze(on, w) { const m = document.getElementById('dframe-main') || document.querySelector('main.dframe-content'); if (m) m.style.right = on ? (w + 'px') : ''; }
+  // reserva w + RESERVE (largura do painel + gap direito + gap entre painel e conteudo) pra o painel flutuante nao cobrir o conteudo.
+  function squeeze(on, w) { const m = document.getElementById('dframe-main') || document.querySelector('main.dframe-content'); if (m) m.style.right = on ? (w + RESERVE + 'px') : ''; }
 
   function buildDrawer() {
     if (document.getElementById(DRAWER_ID)) return;
     const w = getW();
     drawer = document.createElement('div'); drawer.id = DRAWER_ID;
+    // container so posiciona/anima (transparente): o "card" visivel (fundo elevado + cantos) e o col. Recuo de EDGE px das bordas.
     Object.assign(drawer.style, {
-      position: 'fixed', top: '0', right: '0', bottom: '0', width: w + 'px', display: 'none',
-      flexDirection: 'row', background: 'rgb(31,31,30)', borderLeft: '1px solid rgba(255,255,255,0.08)',
-      boxShadow: '-8px 0 24px rgba(0,0,0,0.22)', zIndex: '2147483600',
+      position: 'fixed', top: EDGE + 'px', right: EDGE + 'px', bottom: EDGE + 'px', width: w + 'px', display: 'none',
+      flexDirection: 'row', background: 'transparent', zIndex: '2147483600', willChange: 'transform',
       font: '13px "Anthropic Sans", system-ui, sans-serif'
     });
 
@@ -101,13 +111,14 @@
     handle.addEventListener('mousedown', e => {
       e.preventDefault(); document.body.style.userSelect = 'none';
       gripDrag = true; syncGrip();
-      const move = ev => { const nw = Math.min(maxW(), Math.max(MINW, window.innerWidth - ev.clientX)); drawer.style.width = nw + 'px'; squeeze(true, nw); };
+      const move = ev => { const nw = Math.min(maxW(), Math.max(MINW, window.innerWidth - EDGE - ev.clientX)); drawer.style.width = nw + 'px'; squeeze(true, nw); };
       const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); document.body.style.userSelect = ''; setW(parseInt(drawer.style.width, 10)); gripDrag = false; syncGrip(); };
       document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
     });
 
-    const col = document.createElement('div');
-    Object.assign(col.style, { flex: '1', display: 'flex', flexDirection: 'column', minWidth: '0' });
+    col = document.createElement('div');
+    // o card visivel: fundo elevado + cantos arredondados + overflow hidden (clipa o editor nos cantos). O handle fica FORA do col.
+    Object.assign(col.style, { flex: '1', display: 'flex', flexDirection: 'column', minWidth: '0', background: PANEL_BG, borderRadius: RADIUS + 'px', overflow: 'hidden' });
 
     const header = document.createElement('div');
     Object.assign(header.style, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px 10px 18px', color: MUTED, fontSize: '12px', userSelect: 'none', flex: '0 0 auto' });
@@ -178,12 +189,27 @@
     document.body.appendChild(drawer);
   }
 
-  const isOpen = () => drawer && drawer.style.display !== 'none';
+  // isOpen usa o estado logico (openState), nao o display: no fechamento o display so vira 'none' quando o slide de saida termina.
+  const isOpen = () => openState;
   function syncBtnColor() { if (btnRef) btnRef.style.color = isOpen() ? ACCENT : ICON_REST; }
   function setOpen(open, focus = true) {
     if (!drawer) buildDrawer();
-    if (open) { const id = sid(); currentId = id; const w = getW(); drawer.style.width = w + 'px'; setText(id ? loadNote(id) : ''); drawer.style.display = 'flex'; squeeze(true, w); if (focus) editor.focus(); }
-    else { drawer.style.display = 'none'; squeeze(false); }
+    if (open) {
+      clearTimeout(closeT); openState = true;
+      const id = sid(); currentId = id; const w = getW();
+      drawer.style.width = w + 'px'; setText(id ? loadNote(id) : ''); squeeze(true, w);
+      // slide-in: parte fora da tela (a direita) sem animar, forca reflow, e desliza pra posicao com ENTER_MS.
+      drawer.style.transition = 'none'; drawer.style.transform = HIDDEN_TX; drawer.style.display = 'flex';
+      void drawer.offsetWidth;
+      drawer.style.transition = 'transform ' + ENTER_MS + 'ms ' + ENTER_EASE; drawer.style.transform = 'translateX(0)';
+      if (focus) editor.focus();
+    } else {
+      openState = false;
+      // slide-out: o conteudo volta ja (squeeze off) e o painel desliza pra fora POR CIMA (revela o conteudo, sem "pulo").
+      squeeze(false);
+      drawer.style.transition = 'transform ' + EXIT_MS + 'ms ' + EXIT_EASE; drawer.style.transform = HIDDEN_TX;
+      clearTimeout(closeT); closeT = setTimeout(() => { drawer.style.display = 'none'; }, EXIT_MS + 40);
+    }
     syncBtnColor();
   }
   const toggle = () => setOpen(!isOpen());
