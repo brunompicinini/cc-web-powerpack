@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Claude Code Web — Notepad por sessão
 // @namespace    bruno.uptide
-// @version      2.26
+// @version      2.27
 // @description  Painel lateral de notas por sessão no Claude Code Web (painel flutuante com fundo próprio e cantos arredondados, igual aos painéis nativos; slide-in com a MESMA spring do framer-motion do app, medida quadro a quadro). Atalho Ctrl+Shift+S, redimensionável, links clicáveis. Nota salva por sessionId no localStorage.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
@@ -14,6 +14,7 @@
 // @updateURL    https://raw.githubusercontent.com/brunompicinini/cc-web-powerpack/main/scripts/session-notepad.user.js
 // ==/UserScript==
 
+// Fatos do DOM do Claude Code Web e as pegadinhas de cada parte estao documentados no CLAUDE.md do repo.
 (function ccNotesUserscript() {
   'use strict';
   if (window.ccNotesLoaded) return;
@@ -26,19 +27,11 @@
   const MUTED = 'rgba(255,255,255,0.55)', BRIGHT = 'hsl(60 14% 97%)';
   const ACCENT = '#0099ff'; // azul do botão ativo + links (igual ao Claude Code Web)
   const MINW = 300, DEFW = 750; // largura padrao 750px; sem teto fixo (limita so a janela)
-  // Estilo "painel flutuante" igual aos paineis nativos do Claude Code Web (Background tasks etc.):
-  // fundo proprio elevado (surface-primary-elevated = rgb(38,38,38), != rgb(31,31,30) do body), cantos 8px,
-  // recuo de 9px das bordas da janela (EDGE). O gap visivel entre a barra de acoes/conteudo e o painel e 12px (igual ao
-  // nativo) — mas NAO reservamos 12px de folga: a barra de icones ja tem ~13px de padding propria dentro do main, entao
-  // o box do conteudo fica RENTE ao painel e essa padding vira o gap (o nativo faz igual: main full-width sob o painel).
-  // Medido ao vivo: com main.right = w + 8 a barra fica exatamente 12px do painel, identico ao nativo. Dai RESERVE = 8
-  // (reservar EDGE+12 = 21, como antes, empurrava a barra 13px a mais e o gap dava 25px, longe do nativo).
+  // Painel flutuante igual aos nativos (Background tasks etc.): fundo elevado, cantos 8px, recuo EDGE das bordas.
+  // RESERVE=8 (medido) deixa a barra de acoes 12px do painel, igual ao nativo. Detalhes no CLAUDE.md.
   const PANEL_BG = 'rgb(38,38,38)', RADIUS = 8, EDGE = 9, RESERVE = 8;
-  // Slide: a MESMA spring do framer-motion que os paineis nativos do app usam (Background tasks etc.), medida no app
-  // quadro a quadro (translateX 100%->0: velocidade baixa no inicio, pico no meio, cauda longa assintotica). Reproduzida
-  // fielmente com easing linear() (pontos = progresso normalizado medido), ~300ms. Enter e exit usam a MESMA spring
-  // (o nativo e simetrico); no exit a cauda lenta fica fora da tela (painel ja saiu), entao "parece" mais rapido — igual
-  // a percepcao no nativo. (Nada de cubic-bezier chutado: cubic-bezier nao reproduz a cauda da spring.)
+  // Slide: a MESMA spring do framer-motion dos paineis nativos, medida quadro a quadro e reproduzida com easing linear()
+  // (~300ms; enter e exit iguais — o nativo e simetrico). Pontos medidos e o porque no CLAUDE.md.
   const SPRING_MS = 300;
   const SPRING = 'linear(0, 0.074 5.4%, 0.192 10.7%, 0.359 16.4%, 0.471 19.1%, 0.576 21.8%, 0.665 24.8%, 0.741 27.5%, 0.79 30.2%, 0.857 35.9%, 0.896 41.6%, 0.925 47%, 0.943 52.7%, 0.965 61.1%, 0.976 66.4%, 0.986 74.8%, 0.994 86.2%, 1 100%)';
   const SPRING_TR = 'transform ' + SPRING_MS + 'ms ' + SPRING;
@@ -72,9 +65,8 @@
   let lastMode = null, sidebarApplied = false; // controle do layout por modo (sessao vs home)
 
   const escHtml = s => s.replace(/&/gu, '&amp;').replace(/</gu, '&lt;').replace(/>/gu, '&gt;').replace(/"/gu, '&quot;');
-  // newline fica como \n literal (editor usa white-space: pre-wrap) -> round-trip idempotente.
-  // a URL ja vem escapada por escHtml; tira a pontuacao final que normalmente nao faz parte do link
-  // (ex.: markdown "(url)." -> link "url" + texto ")."). O set exclui ';' pra nao cortar entidades (&amp; etc).
+  // linkify: URL vem escapada por escHtml; tira a pontuacao final que nao faz parte do link (ex.: "(url)." -> "url" + ").").
+  // O set exclui ';' pra nao cortar entidades (&amp; etc). Round-trip idempotente (por isso e seguro rodar no blur).
   const linkify = t => escHtml(t || '').replace(/https?:\/\/[^\s<]+/gu, m => {
     const u = m.replace(/[.,!?)\]}]+$/u, ''), tail = m.slice(u.length);
     return '<a href="' + u + '" target="_blank" rel="noopener" style="color:' + ACCENT + ';text-decoration:underline">' + u + '</a>' + tail;
@@ -83,16 +75,14 @@
   const setText = t => { editor.innerHTML = linkify(t); lastRendered = t; };
   // versao atual lida do Tampermonkey (GM_info), com fallback caso indisponivel.
   const VERSION = (typeof GM_info !== 'undefined' && GM_info && GM_info.script && GM_info.script.version) || '2.20';
-  // abre link em nova aba. active=false => background (nao troca de aba); active=true => abre e foca.
-  // GM_openInTab e a forma confiavel de background: o clique sintetico com modificador NAO funciona (testado, abriu em foreground).
+  // abre link em nova aba. active=false => background; active=true => foca. GM_openInTab e a forma confiavel de
+  // background (clique sintetico com modificador NAO funciona — testado). Por isso o @grant GM_openInTab.
   const openTab = (url, active) => { if (typeof GM_openInTab === 'function') GM_openInTab(url, { active, insert: true, setParent: true }); else window.open(url, '_blank', 'noopener'); };
   // nome do chat = header editavel do Claude (button.cursor-text), inclui o prefixo [id]. Mesma fonte que o script do favicon usa.
   const sessionName = () => { const b = document.querySelector('button.cursor-text'); return b ? (b.textContent || '').trim() : ''; };
 
-  // Empurra o conteudo principal pra abrir espaco pro painel (ajusta style.right). O Claude Code Web renomeou o
-  // container de id #dframe-main pra <main class="dframe-content"> (mesma pegada: position:absolute; left:0; right:0;
-  // setar right encolhe a largura). Tenta o id antigo primeiro (caso revertam) e cai pro novo. Sem ele o painel fica por cima.
-  // reserva w + RESERVE no main (RESERVE=8, medido: deixa a barra de acoes 12px do painel, igual ao nativo — ver constantes).
+  // Empurra o main pra abrir espaco pro painel (style.right). Tenta o id antigo #dframe-main e cai pro <main.dframe-content>.
+  // Reserva w + RESERVE (deixa a barra 12px do painel — ver constantes/CLAUDE.md).
   function squeeze(on, w) { const m = document.getElementById('dframe-main') || document.querySelector('main.dframe-content'); if (m) m.style.right = on ? (w + RESERVE + 'px') : ''; }
 
   function buildDrawer() {
@@ -135,8 +125,7 @@
     Object.assign(left.style, { display: 'flex', alignItems: 'center', minWidth: '0', flex: '1', overflow: 'hidden', gap: '6px' });
     const lbl = document.createElement('span'); lbl.textContent = 'Notes (v' + VERSION + ')';
     Object.assign(lbl.style, { fontWeight: '600', flex: '0 0 auto', whiteSpace: 'nowrap' });
-    // nome do chat: "Notes (vX) · [id] nome". O separador e um span proprio; o gap do container da os 6px dos DOIS lados do ·
-    // (espaco no texto nao serve: flex item descarta whitespace inicial e o trailing fica fragil). Nome trunca com reticencias.
+    // nome do chat: "Notes (vX) · nome". O · e span proprio; o gap:6px do container da o espaco dos dois lados. Nome trunca.
     sepEl = document.createElement('span'); sepEl.textContent = '·';
     Object.assign(sepEl.style, { fontWeight: '600', flex: '0 0 auto' });
     nameEl = document.createElement('span');
@@ -174,18 +163,12 @@
     editor.contentEditable = 'plaintext-only'; editor.spellcheck = false;
     editor.setAttribute('data-ph', 'Markdown notes for this session…');
     Object.assign(editor.style, { flex: '1', overflowY: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: BRIGHT, padding: '4px 18px 18px 18px', lineHeight: '1.55', outline: 'none' });
-    // salva sob currentId (a sessao cuja nota esta carregada no editor), NAO sob sid() fresco: numa troca de sessao
-    // a URL pode mudar antes do syncSession recarregar, e sid() apontaria pra nova sessao -> gravaria o texto antigo nela.
+    // salva sob currentId (a sessao carregada no editor), NAO sid() fresco: numa troca a URL muda antes e gravaria na sessao errada.
     editor.addEventListener('input', () => { const id = currentId; if (!id) return; const val = getText(); clearTimeout(saveT); saveT = setTimeout(() => save(id, val), 300); });
-    // ao perder o foco (clicar fora), salva na hora e re-linkifica — sem precisar recolher/reabrir o painel.
-    // seguro fora do 'input' pq sem caret nao ha risco de pular cursor / dobrar newline (linkify e round-trip idempotente).
-    // so re-renderiza num blur "real" (foco indo pra outro elemento da MESMA pagina, document.hasFocus()===true).
-    // se o documento perdeu o foco (troca de aba/janela, hasFocus===false), NAO reescreve o innerHTML -> o caret sobrevive ao voltar,
-    // mesmo depois de editar. robusto a intermitencia do tab-switch: se o blur nao disparar, o DOM tambem fica intacto.
-    // o linkify do que foi digitado fica pro proximo blur real / troca de sessao. (val !== lastRendered evita re-render redundante.)
+    // blur: salva na hora e re-linkifica. So re-renderiza num blur "real" (foco na MESMA pagina, document.hasFocus()===true);
+    // se o doc perdeu o foco (troca de aba), NAO reescreve o innerHTML -> o caret sobrevive ao voltar. Detalhes no CLAUDE.md.
     editor.addEventListener('blur', () => { const id = currentId; const val = getText(); if (id) { clearTimeout(saveT); save(id, val); } if (val !== lastRendered && document.hasFocus()) setText(val); });
-    // clique num link SEMPRE abre (o editor fica focado por padrao, entao nao da pra exigir "fora de edicao").
-    // pra editar o texto de um link, posicione o caret clicando fora dele / pelas setas.
+    // clique num link SEMPRE abre (o editor fica focado por padrao). Pra editar o texto do link, posicione o caret fora dele.
     editor.addEventListener('mousedown', e => {
       const a = e.target.closest && e.target.closest('a'); if (!a) return;
       e.preventDefault();
@@ -237,13 +220,12 @@
   function findBar() { const a = document.querySelector('button[aria-label="Share"], button[aria-label="Session actions"], button[aria-label="Diff"]'); return a ? (a.closest('span.epitaxy-titlebar-fade') || a.parentElement) : null; }
   function injectButton() { const bar = findBar(); if (!bar || bar.querySelector('[' + BTN_MARK + ']')) return; bar.insertBefore(makeButton(), bar.firstChild); }
   function syncSession() { const id = sid(); if (id !== currentId) { currentId = id; if (isOpen()) setText(id ? loadNote(id) : ''); } }
-  // mostra o nome do chat ao lado do badge (so em sessao); atualiza ao trocar de sessao ou renomear.
-  // mostra "· nome" so em sessao; esconde o separador junto (display none tira tambem o gap, sem espaco sobrando depois do badge na home)
+  // mostra "· nome" do chat so em sessao (atualiza ao trocar/renomear); esconde o separador junto (tira o gap na home).
   function syncName() {
     if (!nameEl) return;
     const inSession = !!sid();
     const n = inSession ? sessionName() : '';
-    // em sessao, ignora leitura vazia transitoria (durante o rename via Ctrl+Shift+R o button.cursor-text vira <input>) -> mantem o ultimo nome, sem piscar
+    // ignora leitura vazia transitoria em sessao (no rename o button.cursor-text vira <input>) -> mantem o ultimo nome, sem piscar
     if (inSession && !n) return;
     if (nameEl.textContent !== n) nameEl.textContent = n;
     const show = n ? '' : 'none';
@@ -251,9 +233,8 @@
     if (nameEl.style.display !== show) nameEl.style.display = show;
   }
 
-  // Layout por modo (so com Auto-open ligado): sessao => notas abertas + sidebar escondida; home => notas fechadas + sidebar visivel.
-  // Notas: aplicadas so na transicao de modo (nao reabre se o usuario fechou na mesma pagina).
-  // Sidebar: a flag 'collapsed' do app e global/persistida (dframe-store), entao gerencio nas transicoes via clique no botao do app (passa pelo handler nativo).
+  // Layout por modo (so com Auto-open ligado): sessao => notas abertas + sidebar escondida; home => o oposto.
+  // Notas so agem na transicao de modo. Sidebar: a flag 'collapsed' e global (dframe-store), gerenciada via clique no botao nativo. Detalhes no CLAUDE.md.
   function applyMode() {
     const mode = sid() ? 'session' : 'home';
     if (mode !== lastMode) {
