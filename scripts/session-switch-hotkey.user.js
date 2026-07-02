@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Claude Code Web — Switch Session Hotkey (⌘⌥[ / ⌘⌥]) + Rename (⌃⇧R)
 // @namespace    bruno.uptide
-// @version      1.6
-// @description  Cmd+Alt+[ e Cmd+Alt+] trocam a sessão aberta (anda pra cima/baixo na lista da sidebar), igual o Cmd+Shift+[ / ] do navegador Dia. Funciona mesmo com a sidebar colapsada. Ctrl+Shift+R renomeia a sessão aberta (abre o input do título e seleciona o texto dentro do prefixo [..], sem os colchetes — ou tudo, se não houver tag — pronto pra digitar). Ctrl+Shift+C abre/fecha o painel de uso do plano (Plan usage / limites / créditos).
+// @version      1.7
+// @description  Cmd+Alt+[ e Cmd+Alt+] trocam a sessão aberta (anda pra cima/baixo na lista da sidebar), igual o Cmd+Shift+[ / ] do navegador Dia. Funciona mesmo com a sidebar colapsada. Ctrl+Shift+R renomeia a sessão aberta (abre o input do título e seleciona o texto dentro do prefixo [..], sem os colchetes — ou tudo, se não houver tag — pronto pra digitar). Ctrl+Shift+C abre/fecha o painel de uso do plano (Plan usage / limites / créditos). Ctrl+Shift+B abre/fecha o painel Background tasks.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
 // @run-at       document-start
@@ -84,6 +84,15 @@
     if (btn) btn.click();
   }
 
+  // Abre/fecha o painel "Background tasks" (o trabalho em background da sessao). E o botao nativo da barra de acoes,
+  // identificado por aria-label que contem "background task" (i) — o label carrega o estado/contagem, ex.:
+  // "1 background task running" / "2 background tasks running" / "Background tasks", por isso o match por substring
+  // case-insensitive (cobre singular/plural e title-case). O .click() e toggle (abre e fecha). So aparece em sessao.
+  function backgroundTasks() {
+    const btn = document.querySelector('button[aria-label*="background task" i]');
+    if (btn) btn.click();
+  }
+
   // e.code (tecla física) e não e.key: no Mac, Alt+[ vira "“" e Alt+] vira "‘" — code continua BracketLeft/Right.
   // (Idem Ctrl+Shift+R: e.code === 'KeyR' é robusto.) Captura (true) pra agir antes de qualquer handler da página.
   document.addEventListener('keydown', e => {
@@ -102,6 +111,11 @@
     // DevTools e o preventDefault em captura não o segura — então lá não capturamos (mesmo motivo do rename).
     if (isMac && e.ctrlKey && e.shiftKey && !e.metaKey && !e.altKey && e.code === 'KeyC') {
       e.preventDefault(); e.stopPropagation(); usage();
+    }
+    // Painel Background tasks: Ctrl+Shift+B (sem Cmd/Alt), SO no Mac. No Win/Linux Ctrl+Shift+B alterna a barra de
+    // favoritos do Chrome e o preventDefault em captura nao o segura — entao la nao capturamos (mesmo motivo do rename/usage).
+    if (isMac && e.ctrlKey && e.shiftKey && !e.metaKey && !e.altKey && e.code === 'KeyB') {
+      e.preventDefault(); e.stopPropagation(); backgroundTasks();
     }
   }, true);
 })();
