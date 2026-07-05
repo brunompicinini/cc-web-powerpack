@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Claude Code Web — Session Status Favicon + Title
 // @namespace    bruno.uptide
-// @version      2.6
-// @description  Favicon = status da sessão (verde=running, teal=PR aberto, amarelo=awaiting input, azul=ready, roxo=merged), recolorindo o ícone real do Claude. Título da aba = nome da sessão.
+// @version      2.7
+// @description  Favicon = session status (green=running, teal=open PR, yellow=awaiting input, blue=ready, purple=merged), recoloring Claude's real icon. Tab title = session name.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
 // @run-at       document-start
@@ -20,9 +20,9 @@
   const onSessionPage = () => /\/code\/session/.test(location.pathname);
 
   // ============================================================
-  // 1) STATUS no FAVICON
+  // 1) STATUS ON THE FAVICON
   // ============================================================
-  const COLORS = { running: '#22c55e', awaiting: '#f5b301', ready: '#4a9eff', merged: '#b796ff', open: '#2dd4bf' }; // null = mantém o coral original
+  const COLORS = { running: '#22c55e', awaiting: '#f5b301', ready: '#4a9eff', merged: '#b796ff', open: '#2dd4bf' }; // null = keep the original coral
   const KEY = { 'Running': 'running', 'Awaiting input': 'awaiting', 'Ready': 'ready' };
 
   const statusEls = () =>
@@ -30,22 +30,22 @@
   const norm = s => (s || '').replace(/[​-‍﻿]/g, '').replace(/\s+/g, ' ').trim();
   function currentLabel() {
     const btns = statusEls();
-    // 1) sessão aberta (marcada na sidebar)
+    // 1) open session (marked in the sidebar)
     let row = btns.find(b => b.closest('[data-row]')?.hasAttribute('data-selected'));
-    // 2) fallback: casa pelo nome do header (ex.: após reload, quando a linha não vem marcada)
+    // 2) fallback: match by the header name (e.g. after reload, when the row isn't marked)
     if (!row) {
       const name = (document.querySelector('button.cursor-text') || {}).textContent;
       if (name) { const n = norm(name); row = btns.find(b => norm(b.textContent) === n); }
     }
-    if (!row) return null; // sem sessão aberta / não está na lista => sem status
+    if (!row) return null; // no open session / not in the list => no status
     const s = row.querySelector('[role="status"]');
     return s ? s.getAttribute('aria-label') : null;
   }
 
-  // Sessão com PR (sem [role="status"] vivo na linha) — o estado vem de um badge
-  // [role="img"] cujo aria-label é "#21, #4 · Merged" (mergeado) ou "#861 · Open" (aberto).
-  // Como não há status, casamos só pela linha selecionada (data-selected).
-  // Retorna 'merged' | 'open' | null (merged tem prioridade — não coexistem na prática).
+  // Session with a PR (no live [role="status"] on the row) — the state comes from a separate badge
+  // [role="img"] whose aria-label is "#21, #4 · Merged" (merged) or "#861 · Open" (open).
+  // Since there's no status, we match only by the selected row (data-selected).
+  // Returns 'merged' | 'open' | null (merged wins — in practice they don't coexist).
   function currentPR() {
     const row = document.querySelector('[data-row][data-selected]');
     if (!row) return null;
@@ -55,9 +55,9 @@
     return null;
   }
 
-  // recolore o ícone real do Claude. Carrega o favicon.ico da própria claude.ai
-  // (mesma origem => canvas não "contamina"), desenha no canvas e usa source-in
-  // pra trocar a cor mantendo a forma. Cada cor é gerada 1x e fica em cache.
+  // recolors Claude's real icon. Loads claude.ai's own favicon.ico
+  // (same origin => the canvas doesn't get "tainted"), draws it on a canvas and uses source-in
+  // to swap the color while keeping the shape. Each color is generated once and cached.
   const cache = {};
   function tint(color) {
     return new Promise(res => {
@@ -90,29 +90,29 @@
   async function applyFavicon() {
     let k;
     if (!onSessionPage()) {
-      k = 'default'; // home / lista => ícone original do Claude
+      k = 'default'; // home / list => Claude's original icon
     } else {
       const lbl = currentLabel();
-      if (lbl) k = KEY[norm(lbl)] || 'default'; // norm: o aria-label pode vir com espaco/zero-width e quebrar o lookup
-      else { const pr = currentPR(); if (pr) k = pr; // sem status na linha + badge PR => roxo (merged) / verde (open)
-             else { if (lastKey) return; k = 'default'; } } // sessão ainda carregando: mantém o último
+      if (lbl) k = KEY[norm(lbl)] || 'default'; // norm: the aria-label may carry spaces/zero-width chars and break the lookup
+      else { const pr = currentPR(); if (pr) k = pr; // no status on the row + PR badge => purple (merged) / teal (open)
+             else { if (lastKey) return; k = 'default'; } } // session still loading: keep the last one
     }
     if (k === lastKey) return;
     if (cache[k] === undefined) {
       const data = await tint(k === 'default' ? null : COLORS[k]);
-      if (!data) return; // falha transitoria ao carregar o favicon.ico: NAO cacheia nem avanca lastKey -> tenta de novo no proximo tick
+      if (!data) return; // transient failure loading favicon.ico: do NOT cache nor advance lastKey -> retry next tick
       cache[k] = data;
     }
-    lastKey = k; // so avanca depois de ter o icone em maos (evita travar num key cujo tint falhou / chegou fora de ordem)
+    lastKey = k; // only advance once we have the icon in hand (avoids getting stuck on a key whose tint failed / arrived out of order)
     setFavicon(cache[k]);
   }
 
   // ============================================================
-  // 2) NOME da sessão no TÍTULO
+  // 2) SESSION NAME IN THE TITLE
   // ============================================================
-  // O título nativo do app é "Claude Code". Aqui trocamos pelo nome da sessão
-  // (o botão editável do topo). O React não fica revertendo, então sem guerra:
-  // só re-aplicamos quando o nome muda ou quando o app reseta o título (ex.: navegação).
+  // The app's native title is "Claude Code". Here we swap it for the session name
+  // (the editable button at the top). React doesn't keep reverting it, so no war:
+  // we only re-apply when the name changes or when the app resets the title (e.g. navigation).
   function sessionName() {
     const b = document.querySelector('button.cursor-text');
     const n = b && b.textContent.trim();
@@ -121,8 +121,8 @@
   let lastSetTitle = null;
   function applyTitle() {
     if (!onSessionPage()) {
-      // home: se o titulo ainda for o nome que NOS setamos (o app nao resetou), volta pro padrao.
-      // so age quando o titulo stale e exatamente o nosso -> se o app ja mexeu, nao entra em guerra.
+      // home: if the title is still the name WE set (the app didn't reset it), restore the default.
+      // only acts when the stale title is exactly ours -> if the app already changed it, no war.
       if (lastSetTitle && document.title === lastSetTitle) { document.title = 'Claude Code'; lastSetTitle = null; }
       return;
     }
@@ -133,14 +133,14 @@
   function applyAll() { applyFavicon(); applyTitle(); }
 
   // ============================================================
-  // disparos: observers escopados + rede de segurança 1s + navegação SPA
+  // triggers: scoped observers + 1s safety net + SPA navigation
   // ============================================================
   let pend = false;
   const schedule = () => { if (pend) return; pend = true; setTimeout(() => { pend = false; applyAll(); }, 120); };
   const mo = new MutationObserver(schedule);
-  // No document-start o aside da sidebar e o header editavel ainda nao existem (o React monta depois), entao um observe()
-  // unico no start() nao pegava nada e so o poll de 1s agia. Ligamos de forma idempotente e re-tentamos no interval ate
-  // cada no aparecer. (O header vira <input> no rename; re-bind apos rename fica por conta do poll/title observer.)
+  // At document-start the sidebar aside and the editable header don't exist yet (React mounts them later), so a single
+  // observe() in start() caught nothing and only the 1s poll acted. We bind idempotently and retry on the interval until
+  // each node appears. (The header becomes an <input> on rename; re-binding after rename is handled by the poll/title observer.)
   const bound = { aside: false, hdr: false, title: false };
   function bindObservers() {
     if (!bound.aside) { const a = document.querySelector('aside.dframe-sidebar'); if (a) { mo.observe(a, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-label', 'data-selected'] }); bound.aside = true; } }

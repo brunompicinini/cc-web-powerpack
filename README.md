@@ -1,71 +1,71 @@
 # CC Web Power Pack
 
-Coleção de **userscripts** (Tampermonkey) que melhoram o **Claude Code Web** — `claude.ai/code`.
+A collection of **userscripts** (Tampermonkey) that improve **Claude Code Web** — `claude.ai/code`.
 
-Cada script fica em [`scripts/`](scripts/), termina em `.user.js` e instala direto pela URL **raw** do GitHub, com **auto‑atualização** (a cada `git push`, o Tampermonkey puxa a nova versão).
+Each script lives in [`scripts/`](scripts/), ends in `.user.js`, and installs straight from the GitHub **raw** URL, with **auto-update** (on every `git push`, Tampermonkey pulls the new version).
 
 ---
 
 ## Scripts
 
-| Script | O que faz |
+| Script | What it does |
 | --- | --- |
-| [`session-status-favicon.user.js`](scripts/session-status-favicon.user.js) | Recolore o **favicon** da aba conforme o status da sessão aberta — 🟢 running, 🟡 awaiting input, 🔵 ready, 🟣 merged — e troca o **título da aba** pelo nome da sessão. |
-| [`session-notepad.user.js`](scripts/session-notepad.user.js) | **Notepad por sessão**: painel lateral **flutuante** de notas (fundo próprio, cantos arredondados e slide-in — igual aos painéis nativos). Atalho `Ctrl+Shift+S`, redimensionável, links clicáveis. Salva por `sessionId` no `localStorage`. |
-| [`session-switch-hotkey.user.js`](scripts/session-switch-hotkey.user.js) | **Trocar de sessão + atalhos**: `Cmd+Alt+[` / `Cmd+Alt+]` andam pra cima/baixo na lista de sessões da sidebar (igual o `Cmd+Shift+[ / ]` do navegador Dia), mesmo com a sidebar colapsada. Também (só Mac): `Ctrl+Shift+R` renomeia a sessão, `Ctrl+Shift+C` abre o uso do plano, `Ctrl+Shift+B` abre o Background tasks, `Ctrl+Shift+A` abre o Artifacts. |
+| [`session-status-favicon.user.js`](scripts/session-status-favicon.user.js) | Recolors the tab **favicon** based on the open session's status — 🟢 running, 🟡 awaiting input, 🔵 ready, 🟣 merged, teal = open PR — and swaps the **tab title** for the session name. |
+| [`session-notepad.user.js`](scripts/session-notepad.user.js) | **Per-session notepad**: a **floating** side panel for notes (its own background, rounded corners and slide-in — like the native panels). `Ctrl+Shift+S` shortcut, resizable, clickable links. Saved per `sessionId` in `localStorage`. |
+| [`session-shortcuts.user.js`](scripts/session-shortcuts.user.js) | **Keyboard shortcuts.** `Ctrl+Shift+[` / `Ctrl+Shift+]` move up/down the session list (even when the sidebar is collapsed) and `Ctrl+Shift+S` toggles the notepad — these work on **every platform**. `Ctrl+Shift+R` renames the session (selects the leading status token — a `[tag]` or a status emoji), `Ctrl+Shift+C` opens plan usage, `Ctrl+Shift+B` opens Background tasks, `Ctrl+Shift+A` opens Artifacts — these are **Mac only** (on Windows/Linux they collide with reserved Chrome shortcuts). |
 
 ---
 
-## Instalação
+## Installation
 
 ### 1. Tampermonkey
-Instale a extensão [Tampermonkey](https://www.tampermonkey.net/) no Chrome (ou outro Chromium).
+Install the [Tampermonkey](https://www.tampermonkey.net/) extension in Chrome (or another Chromium browser).
 
-### 2. Ligar "Allow User Scripts" (Chrome 138+)
-A partir do Chrome 138 a permissão de user scripts foi separada do *Developer Mode* global. Sem isso o script **instala mas não roda**:
+### 2. Enable "Allow User Scripts" (Chrome 138+)
+Starting with Chrome 138 the user-scripts permission was split out from the global *Developer Mode*. Without it the script **installs but doesn't run**:
 
-1. Abra `chrome://extensions`
-2. Abra os **detalhes** do Tampermonkey
-3. Ligue o toggle **"Allow User Scripts"**
+1. Open `chrome://extensions`
+2. Open Tampermonkey's **details**
+3. Turn on the **"Allow User Scripts"** toggle
 
-> Em versões antigas, o equivalente era ligar o *Developer Mode* global. Um aviso de "developer mode required" às vezes aparece bugado — se os scripts já estão rodando, pode ignorar.
+> On older versions the equivalent was turning on the global *Developer Mode*. A "developer mode required" warning sometimes shows up buggy — if the scripts are already running, you can ignore it.
 
-### 3. Instalar os scripts
-Abra a **raw URL** de cada script (termina em `.user.js`) e o Tampermonkey intercepta com a tela de **Install**:
+### 3. Install the scripts
+Open each script's **raw URL** (ends in `.user.js`) and Tampermonkey intercepts it with the **Install** screen:
 
 - **Session Status Favicon + Title** →
   `https://raw.githubusercontent.com/brunompicinini/cc-web-powerpack/main/scripts/session-status-favicon.user.js`
 - **Session Notepad** →
   `https://raw.githubusercontent.com/brunompicinini/cc-web-powerpack/main/scripts/session-notepad.user.js`
-- **Switch Session Hotkey** →
-  `https://raw.githubusercontent.com/brunompicinini/cc-web-powerpack/main/scripts/session-switch-hotkey.user.js`
+- **Shortcuts** →
+  `https://raw.githubusercontent.com/brunompicinini/cc-web-powerpack/main/scripts/session-shortcuts.user.js`
 
-Clique em **Install**. Pronto.
+Click **Install**. Done.
 
 ---
 
-## Auto‑atualização
+## Auto-update
 
-Cada script traz no cabeçalho:
+Each script carries in its header:
 
 ```js
-// @downloadURL  https://raw.githubusercontent.com/brunompicinini/cc-web-powerpack/main/scripts/<arquivo>.user.js
-// @updateURL    https://raw.githubusercontent.com/brunompicinini/cc-web-powerpack/main/scripts/<arquivo>.user.js
+// @downloadURL  https://raw.githubusercontent.com/brunompicinini/cc-web-powerpack/main/scripts/<file>.user.js
+// @updateURL    https://raw.githubusercontent.com/brunompicinini/cc-web-powerpack/main/scripts/<file>.user.js
 ```
 
-O Tampermonkey checa o `@updateURL` periodicamente. Quando o `@version` no repositório for maior que o instalado, ele baixa a nova versão sozinho. **Para publicar uma atualização: edite o script, suba o `@version`, e dê `git push`.**
+Tampermonkey checks `@updateURL` periodically. When the `@version` in the repo is higher than the installed one, it downloads the new version by itself. **To publish an update: edit the script, bump `@version`, and `git push`.**
 
 ---
 
-## Desenvolvimento
+## Development
 
-- Um script por arquivo em `scripts/`, sempre terminando em `.user.js`.
-- Mantenha `@downloadURL` / `@updateURL` apontando para a raw da branch `main`.
-- **Suba o `@version`** a cada mudança publicada — é o que dispara o auto‑update.
-- Veja [`CLAUDE.md`](CLAUDE.md) para convenções e detalhes do DOM do Claude Code Web.
+- One script per file in `scripts/`, always ending in `.user.js`.
+- Keep `@downloadURL` / `@updateURL` pointing at the raw URL of the `main` branch.
+- **Bump `@version`** on every published change — that's what triggers auto-update.
+- See [`CLAUDE.md`](CLAUDE.md) for conventions and Claude Code Web DOM details.
 
 ---
 
-## Licença
+## License
 
 [MIT](LICENSE) © Bruno Picinini
