@@ -11,8 +11,8 @@ Each script lives in [`scripts/`](scripts/), ends in `.user.js`, and installs st
 | Script | What it does |
 | --- | --- |
 | [`session-status-favicon.user.js`](scripts/session-status-favicon.user.js) | Recolors the tab **favicon** based on the open session's status — 🟢 running, 🟡 awaiting input, 🔵 ready, 🟣 merged, teal = open PR — and swaps the **tab title** for the session name. |
-| [`session-notepad.user.js`](scripts/session-notepad.user.js) | **Per-session notepad**: a **floating** side panel for notes (its own background, rounded corners and slide-in — like the native panels). `Ctrl+Shift+S` shortcut, resizable, clickable links. Saved per `sessionId` in `localStorage`. |
-| [`session-shortcuts.user.js`](scripts/session-shortcuts.user.js) | **Keyboard shortcuts.** `Ctrl+Shift+[` / `Ctrl+Shift+]` move up/down the session list (even when the sidebar is collapsed) and `Ctrl+Shift+S` toggles the notepad — these work on **every platform**. `Ctrl+Shift+R` renames the session (selects the leading status token — a `[tag]` or a status emoji), `Ctrl+Shift+C` opens plan usage, `Ctrl+Shift+B` opens Background tasks, `Ctrl+Shift+A` opens Artifacts — these are **Mac only** (on Windows/Linux they collide with reserved Chrome shortcuts). |
+| [`session-notepad.user.js`](scripts/session-notepad.user.js) | **Per-session notepad**: a **floating** side panel for notes (its own background, rounded corners and slide-in — like the native panels). Toggle shortcut `Ctrl+S` (Mac) / `Alt+S` (Windows), resizable, clickable links. Saved per `sessionId` in `localStorage`. |
+| [`session-shortcuts.user.js`](scripts/session-shortcuts.user.js) | **Keyboard shortcuts.** The modifier is **`Ctrl` on Mac** and **`Alt` on Windows/Linux** (each is the one the browser leaves free). `Mod + [` / `]` move up/down the session list (even when the sidebar is collapsed), `Mod + S` toggles the notepad, `Mod + R` renames the session (selecting the leading status token — a `[tag]` or a status emoji), `Mod + C` opens plan usage, `Mod + D` toggles the Diff, `Mod + B` opens Background tasks, `Mod + A` opens Artifacts. All work on both platforms. |
 
 ---
 

@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Claude Code Web — Shortcuts
 // @namespace    bruno.uptide
-// @version      2.0
-// @description  Keyboard shortcuts for Claude Code Web. Ctrl+Shift+[ / Ctrl+Shift+] move between sessions (up/down the sidebar list, even when collapsed) and Ctrl+Shift+S toggles the Session Notepad — these work on every platform. Ctrl+Shift+R renames the open session (selects the leading status token — the text inside [..] brackets, or a leading status emoji — ready to retype), Ctrl+Shift+C toggles the plan-usage panel, Ctrl+Shift+B toggles Background tasks and Ctrl+Shift+A toggles Artifacts (in the ⋮ Session actions menu) — these four are Mac-only, since on Windows/Linux they collide with reserved Chrome shortcuts (reload, DevTools, bookmarks bar, tab search) that a page can't override.
+// @version      2.1
+// @description  Keyboard shortcuts for Claude Code Web. The modifier is Ctrl on Mac and Alt on Windows/Linux (each is the one the browser leaves free — Mac Chrome uses Cmd, Windows Chrome uses Ctrl). Mod+[ / Mod+] move between sessions (up/down the sidebar list, even when collapsed), Mod+S toggles the Session Notepad, Mod+R renames the open session (selects the leading status token — the text inside [..] brackets, or a leading status emoji — ready to retype), Mod+C toggles plan usage, Mod+D toggles the Diff, Mod+B toggles Background tasks and Mod+A toggles Artifacts (in the ⋮ Session actions menu). All eight work on both platforms. Note: on Mac, Ctrl+A / Ctrl+B / Ctrl+D shadow the system text-editing keys (line start / back one char / delete forward).
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
 // @run-at       document-start
@@ -20,9 +20,11 @@
   if (window.ccShortcutsLoaded) return;
   window.ccShortcutsLoaded = true;
 
-  // Mac gate for the combos that collide with a reserved Chrome shortcut on Win/Linux (R=reload, C=DevTools, B=bookmarks
-  // bar, A=tab search) — a page's preventDefault can't hold those. The switch keys and notepad toggle aren't bound by
-  // Chrome, so they run on every platform.
+  // Modifier per platform: Ctrl on Mac (the browser owns Cmd, so plain Ctrl is free), Alt on Windows/Linux (the browser
+  // owns Ctrl there — Ctrl+Shift+letter collides with reserved combos a page can't override: reload, DevTools, bookmarks
+  // bar, tab search — while Alt+key is free). Can't use Alt on Mac: Option(Alt)+letter types special chars (é, ø).
+  // Caveat: on Mac, Ctrl+A / Ctrl+B / Ctrl+D shadow the macOS text-editing bindings (line start / back one char / delete
+  // forward); the handler has no focus guard (rename/switch must work from anywhere), so that trade lands even while typing. See CLAUDE.md.
   const isMac = /Mac/i.test(navigator.platform || navigator.userAgent || '');
 
   // Sessions in the sidebar = div[data-row] that contains a button[data-row-main-button] (menu items don't). DOM order = visual order.
@@ -88,6 +90,12 @@
     if (btn) btn.click();
   }
 
+  // Toggle the Diff view: the action-bar "Diff" button (the same one the app opens with its native Ctrl+Shift+D).
+  function diff() {
+    const btn = document.querySelector('button[aria-label="Diff"]');
+    if (btn) btn.click();
+  }
+
   // Toggle the Session Notepad panel by clicking the button the notepad userscript injects into the action bar
   // ([data-cc-notes-btn]). Pure DOM, no cross-script event. Only present in a session — where the notepad is used.
   function toggleNotes() {
@@ -117,19 +125,24 @@
     setTimeout(step, isOpen() ? 0 : 40);
   }
 
-  // Use e.code (physical key), not e.key: with Shift, "[" / "]" report as "{" / "}". Capture phase to act before the page.
+  // Require the platform modifier and no others. On Win/Linux we require !ctrl too, because AltGr (the right Alt on
+  // international layouts) reports as Ctrl+Alt — without that guard AltGr+letter would fire a shortcut mid-typing.
+  // Use e.code (physical key), not e.key: with Alt/Shift the printed char changes but the code doesn't. Capture phase to act first.
   document.addEventListener('keydown', e => {
-    if (!(e.ctrlKey && e.shiftKey && !e.metaKey && !e.altKey)) return;
+    const mod = isMac
+      ? (e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey)
+      : (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey);
+    if (!mod) return;
     const stop = () => { e.preventDefault(); e.stopPropagation(); };
-    // Not bound by Chrome -> these work on every platform:
-    if (e.code === 'BracketRight') { stop(); go(1); return; }        // next session (down)
-    if (e.code === 'BracketLeft') { stop(); go(-1); return; }        // previous session (up)
-    if (e.code === 'KeyS') { stop(); toggleNotes(); return; }        // toggle the Session Notepad
-    // Collide with reserved Chrome shortcuts on Win/Linux (unblockable by a page) -> Mac only:
-    if (!isMac) return;
-    if (e.code === 'KeyR') { stop(); rename(); }
-    else if (e.code === 'KeyC') { stop(); usage(); }
-    else if (e.code === 'KeyB') { stop(); togglePanel(/^Background tasks$/i); }
-    else if (e.code === 'KeyA') { stop(); togglePanel(/^Artifacts$/i); }
+    switch (e.code) {
+      case 'BracketRight': stop(); go(1); break;                       // next session (down)
+      case 'BracketLeft':  stop(); go(-1); break;                      // previous session (up)
+      case 'KeyS': stop(); toggleNotes(); break;                       // toggle the Session Notepad
+      case 'KeyR': stop(); rename(); break;                            // rename the open session
+      case 'KeyC': stop(); usage(); break;                             // toggle plan usage
+      case 'KeyD': stop(); diff(); break;                              // toggle the Diff view
+      case 'KeyB': stop(); togglePanel(/^Background tasks$/i); break;  // toggle Background tasks
+      case 'KeyA': stop(); togglePanel(/^Artifacts$/i); break;         // toggle Artifacts
+    }
   }, true);
 })();

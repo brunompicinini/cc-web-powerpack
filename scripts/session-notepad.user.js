@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Claude Code Web — Session Notepad
 // @namespace    bruno.uptide
-// @version      2.28
-// @description  Per-session notes side panel for Claude Code Web (floating panel with its own background and rounded corners, like the native panels; slide-in with the SAME framer-motion spring as the app, measured frame by frame). Ctrl+Shift+S shortcut (defined in session-shortcuts.user.js), resizable, clickable links. Note saved per sessionId in localStorage.
+// @version      2.29
+// @description  Per-session notes side panel for Claude Code Web (floating panel with its own background and rounded corners, like the native panels; slide-in with the SAME framer-motion spring as the app, measured frame by frame). Toggle shortcut Ctrl+S (Mac) / Alt+S (Windows), defined in session-shortcuts.user.js; resizable, clickable links. Note saved per sessionId in localStorage.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
 // @run-at       document-start
@@ -208,7 +208,8 @@
 
   function makeButton() {
     const btn = document.createElement('button'); btn.type = 'button';
-    btn.setAttribute(BTN_MARK, '1'); btn.setAttribute('aria-label', 'Notes'); btn.setAttribute('title', 'Notes (Ctrl+Shift+S)');
+    const scMod = /Mac/i.test(navigator.platform || navigator.userAgent || '') ? 'Ctrl' : 'Alt';  // shortcut modifier (matches session-shortcuts.user.js)
+    btn.setAttribute(BTN_MARK, '1'); btn.setAttribute('aria-label', 'Notes'); btn.setAttribute('title', 'Notes (' + scMod + '+S)');
     Object.assign(btn.style, { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px', padding: '0', border: '0', background: 'transparent', color: ICON_REST, cursor: 'pointer', borderRadius: '6px', flex: '0 0 auto' });
     btn.innerHTML = ICON;
     btn.addEventListener('mouseenter', () => { if (!isOpen()) btn.style.color = ICON_HOVER; });
@@ -265,8 +266,8 @@
     new MutationObserver(schedule).observe(document.body, { subtree: true, childList: true });
     setInterval(tick, 1000);
     window.addEventListener('resize', () => { if (isOpen()) { const w = Math.min(getW(), window.innerWidth - 40); drawer.style.width = w + 'px'; squeeze(true, w); } });
-    // Ctrl+Shift+S (toggle) lives in session-shortcuts.user.js now — it clicks this panel's injected button
-    // ([data-cc-notes-btn]). Esc intentionally does NOT close the panel (Bruno uses Esc for other things).
+    // The toggle shortcut (Ctrl+S on Mac / Alt+S on Windows) lives in session-shortcuts.user.js now — it clicks this
+    // panel's injected button ([data-cc-notes-btn]). Esc intentionally does NOT close the panel (Bruno uses Esc for other things).
     ['pushState', 'replaceState'].forEach(m => { const o = history[m]; history[m] = function reassigned(...args) { const r = o.apply(this, args); setTimeout(tick, 60); return r; }; });
     addEventListener('popstate', () => setTimeout(tick, 60));
   }
