@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Claude Code Web — Session Notepad
 // @namespace    bruno.uptide
-// @version      2.29
+// @version      2.30
 // @description  Per-session notes side panel for Claude Code Web (floating panel with its own background and rounded corners, like the native panels; slide-in with the SAME framer-motion spring as the app, measured frame by frame). Toggle shortcut Ctrl+S (Mac) / Alt+S (Windows), defined in session-shortcuts.user.js; resizable, clickable links. Note saved per sessionId in localStorage.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
@@ -62,7 +62,7 @@
   let drawer = null, col = null, editor = null, currentId = null, saveT = null, btnRef = null, nameEl = null, sepEl = null;
   let openState = false, closeT = null; // logical panel state (independent of display: robust during the exit slide)
   let lastRendered = null; // last text rendered in the editor; blur only re-renders if it changed (preserves the caret when switching tabs without editing)
-  let lastMode = null, sidebarApplied = false; // per-mode layout control (session vs home)
+  let lastMode = null; // per-mode notes control (session vs home)
 
   const escHtml = s => s.replace(/&/gu, '&amp;').replace(/</gu, '&lt;').replace(/>/gu, '&gt;').replace(/"/gu, '&quot;');
   // linkify: the URL comes escaped by escHtml; strips trailing punctuation that isn't part of the link (e.g. "(url)." -> "url" + ").").
@@ -132,9 +132,9 @@
     Object.assign(nameEl.style, { fontWeight: '600', minWidth: '0', flex: '0 1 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' });
     left.appendChild(lbl); left.appendChild(sepEl); left.appendChild(nameEl);
 
-    // "Auto-open" toggle (default on): in a session it opens the notes and hides the sidebar; on home it does the opposite (no notes, with sidebar). State in A_KEY.
+    // "Auto-open" toggle (default on): opens the notes by itself in a session and closes them on home. State in A_KEY.
     const auto = document.createElement('button'); auto.type = 'button';
-    auto.setAttribute('aria-label', 'Auto-open notes on load'); auto.title = 'In a session: opens the notes and hides the sidebar. On home: closes the notes and shows the sidebar.';
+    auto.setAttribute('aria-label', 'Auto-open notes on load'); auto.title = 'In a session: opens the notes. On home: closes the notes.';
     Object.assign(auto.style, { display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'transparent', border: '0', color: MUTED, cursor: 'pointer', padding: '0', fontSize: '11px', fontWeight: '600', userSelect: 'none' });
     const autoLbl = document.createElement('span'); autoLbl.textContent = 'Auto-open';
     const track = document.createElement('span');
@@ -143,7 +143,7 @@
     Object.assign(knob.style, { position: 'absolute', top: '2px', left: '2px', width: '11px', height: '11px', borderRadius: '50%', background: '#fff', transition: 'transform .2s ease' });
     track.appendChild(knob); auto.appendChild(autoLbl); auto.appendChild(track);
     const syncAuto = () => { const on = getAuto(); track.style.background = on ? ACCENT : 'rgba(255,255,255,0.18)'; knob.style.transform = on ? 'translateX(11px)' : 'translateX(0)'; };
-    auto.addEventListener('click', () => { setAuto(!getAuto()); syncAuto(); lastMode = null; sidebarApplied = false; applyMode(); }); // flip applies immediately
+    auto.addEventListener('click', () => { setAuto(!getAuto()); syncAuto(); lastMode = null; applyMode(); }); // flip applies immediately
     syncAuto();
 
     const close = document.createElement('button'); close.type = 'button'; close.textContent = '×';
@@ -234,33 +234,22 @@
     if (nameEl.style.display !== show) nameEl.style.display = show;
   }
 
-  // Per-mode layout (only when Auto-open is on): session => notes open + sidebar hidden; home => the opposite.
-  // Notes only act on the mode transition. Sidebar: the 'collapsed' flag is global (dframe-store), managed via a click on the native button. Details in CLAUDE.md.
+  // Per-mode notes (only when Auto-open is on): session => notes open; home => notes closed. Acts only on the mode transition.
+  // (The sidebar is NOT touched anymore — the auto-collapse was removed in v2.30; it got in the way more than it helped.)
   function applyMode() {
     const mode = sid() ? 'session' : 'home';
-    if (mode !== lastMode) {
-      lastMode = mode; sidebarApplied = false;
-      if (getAuto()) {
-        if (mode === 'session') { if (!isOpen()) setOpen(true, false); } // without stealing focus
-        else if (isOpen()) setOpen(false);
-      }
-    }
-    if (getAuto() && !sidebarApplied) {
-      const want = mode === 'session';                                    // session => collapsed; home => open
-      const collapsed = !!document.querySelector('[aria-label="Open sidebar"]');   // the "Open" button only exists when collapsed
-      const expanded = !!document.querySelector('[aria-label="Collapse sidebar"]'); // "Collapse" only when open
-      if (!collapsed && !expanded) return;                                // sidebar not mounted yet; try next tick
-      if (want === collapsed) { sidebarApplied = true; return; }          // already how we want it
-      const btn = document.querySelector(want ? '[aria-label="Collapse sidebar"]' : '[aria-label="Open sidebar"]');
-      if (btn) btn.click();                                               // doesn't mark applied: the next tick confirms the new state
-    }
+    if (mode === lastMode) return;
+    lastMode = mode;
+    if (!getAuto()) return;
+    if (mode === 'session') { if (!isOpen()) setOpen(true, false); } // without stealing focus
+    else if (isOpen()) setOpen(false);
   }
 
   function tick() { injectButton(); syncSession(); applyMode(); syncName(); if (isOpen()) squeeze(true, parseInt(drawer.style.width, 10) || getW()); }
 
   function start() {
     if (!document.body) { setTimeout(start, 50); return; }
-    buildDrawer(); tick(); // applyMode (inside tick) decides notes+sidebar according to the mode
+    buildDrawer(); tick(); // applyMode (inside tick) opens/closes the notes according to the mode
     let pend = false;
     const schedule = () => { if (pend) return; pend = true; setTimeout(() => { pend = false; tick(); }, 150); };
     new MutationObserver(schedule).observe(document.body, { subtree: true, childList: true });
