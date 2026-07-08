@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Claude Code Web — Shortcuts
 // @namespace    bruno.uptide
-// @version      2.1
-// @description  Keyboard shortcuts for Claude Code Web. The modifier is Ctrl on Mac and Alt on Windows/Linux (each is the one the browser leaves free — Mac Chrome uses Cmd, Windows Chrome uses Ctrl). Mod+[ / Mod+] move between sessions (up/down the sidebar list, even when collapsed), Mod+S toggles the Session Notepad, Mod+R renames the open session (selects the leading status token — the text inside [..] brackets, or a leading status emoji — ready to retype), Mod+C toggles plan usage, Mod+D toggles the Diff, Mod+B toggles Background tasks and Mod+A toggles Artifacts (in the ⋮ Session actions menu). All eight work on both platforms. Note: on Mac, Ctrl+A / Ctrl+B / Ctrl+D shadow the system text-editing keys (line start / back one char / delete forward).
+// @version      2.2
+// @description  Keyboard shortcuts for Claude Code Web. The modifier is Ctrl on Mac and Alt on Windows/Linux (each is the one the browser leaves free — Mac Chrome uses Cmd, Windows Chrome uses Ctrl). Mod+[ / Mod+] move between sessions (up/down the sidebar list, even when collapsed), Mod+S toggles the Session Notepad, Mod+R renames the open session (selects the leading status token — the text inside [..] brackets, or a leading status emoji — ready to retype), Mod+C toggles plan usage, Mod+D toggles the Diff, Mod+B toggles Background tasks and Mod+A toggles Artifacts (in the ⋮ Session actions menu). All eight work on both platforms. Separately, Cmd+\ (Mac) / Ctrl+\ (Windows) toggles the native sidebar — same as the app's native Cmd/Ctrl+B. Note: on Mac, Ctrl+A / Ctrl+B / Ctrl+D shadow the system text-editing keys (line start / back one char / delete forward).
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
 // @run-at       document-start
@@ -103,6 +103,13 @@
     if (btn) btn.click();
   }
 
+  // Toggle the native sidebar (open/collapse). The app renders exactly one of these buttons at a time:
+  // [aria-label="Collapse sidebar"] when it's open, [aria-label="Open sidebar"] when collapsed. Click whichever exists.
+  function toggleSidebar() {
+    const btn = document.querySelector('[aria-label="Collapse sidebar"], [aria-label="Open sidebar"]');
+    if (btn) btn.click();
+  }
+
   // Toggle a panel that lives in the ⋮ "Session actions" menu (Artifacts, Background tasks): open the menu, click the
   // visible item by text, then close the menu (re-click the trigger). aria-expanded on the trigger = the real menu state.
   function togglePanel(labelRe) {
@@ -129,6 +136,16 @@
   // international layouts) reports as Ctrl+Alt — without that guard AltGr+letter would fire a shortcut mid-typing.
   // Use e.code (physical key), not e.key: with Alt/Shift the printed char changes but the code doesn't. Capture phase to act first.
   document.addEventListener('keydown', e => {
+    // Sidebar toggle: Cmd+\ (Mac) / Ctrl+\ (Win/Linux) — mirrors the app's native Cmd/Ctrl+B. Uses Cmd on Mac (not the
+    // Ctrl the rest use): \ isn't a reserved Chrome combo, so the page can intercept it (the app itself binds Cmd+B).
+    // Handled before the Mod gate below, which rejects Cmd on Mac. Match e.code OR e.key so it fires on any keyboard layout.
+    const sidebarMod = isMac
+      ? (e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey)
+      : (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey);
+    if (sidebarMod && (e.code === 'Backslash' || e.key === '\\')) {
+      e.preventDefault(); e.stopPropagation(); toggleSidebar(); return;
+    }
+
     const mod = isMac
       ? (e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey)
       : (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey);
