@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Claude Code Web — Shortcuts
 // @namespace    bruno.uptide
-// @version      2.2
-// @description  Keyboard shortcuts for Claude Code Web. The modifier is Ctrl on Mac and Alt on Windows/Linux (each is the one the browser leaves free — Mac Chrome uses Cmd, Windows Chrome uses Ctrl). Mod+[ / Mod+] move between sessions (up/down the sidebar list, even when collapsed), Mod+S toggles the Session Notepad, Mod+R renames the open session (selects the leading status token — the text inside [..] brackets, or a leading status emoji — ready to retype), Mod+C toggles plan usage, Mod+D toggles the Diff, Mod+B toggles Background tasks and Mod+A toggles Artifacts (in the ⋮ Session actions menu). All eight work on both platforms. Separately, Cmd+\ (Mac) / Ctrl+\ (Windows) toggles the native sidebar — same as the app's native Cmd/Ctrl+B. Note: on Mac, Ctrl+A / Ctrl+B / Ctrl+D shadow the system text-editing keys (line start / back one char / delete forward).
+// @version      2.3
+// @description  Keyboard shortcuts for Claude Code Web. The modifier is Ctrl on Mac and Alt on Windows/Linux (each is the one the browser leaves free — Mac Chrome uses Cmd, Windows Chrome uses Ctrl). Mod+[ / Mod+] move between sessions (up/down the sidebar list, even when collapsed), Mod+S toggles the Session Notepad, Mod+R renames the open session (selects the leading status token — the text inside [..] brackets, or a leading status emoji — ready to retype), Mod+C toggles plan usage, Mod+D toggles the Diff, Mod+B toggles Background tasks and Mod+A toggles Artifacts (in the ⋮ Session actions menu). All eight work on both platforms. Separately, Ctrl+\ toggles the native sidebar on every platform. Note: on Mac, Ctrl+A / Ctrl+B / Ctrl+D shadow the system text-editing keys (line start / back one char / delete forward).
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
 // @run-at       document-start
@@ -136,12 +136,11 @@
   // international layouts) reports as Ctrl+Alt — without that guard AltGr+letter would fire a shortcut mid-typing.
   // Use e.code (physical key), not e.key: with Alt/Shift the printed char changes but the code doesn't. Capture phase to act first.
   document.addEventListener('keydown', e => {
-    // Sidebar toggle: Cmd+\ (Mac) / Ctrl+\ (Win/Linux) — mirrors the app's native Cmd/Ctrl+B. Uses Cmd on Mac (not the
-    // Ctrl the rest use): \ isn't a reserved Chrome combo, so the page can intercept it (the app itself binds Cmd+B).
-    // Handled before the Mod gate below, which rejects Cmd on Mac. Match e.code OR e.key so it fires on any keyboard layout.
-    const sidebarMod = isMac
-      ? (e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey)
-      : (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey);
+    // Sidebar toggle: Ctrl+\ on every platform (Bruno's muscle memory; on Win/Linux it also mirrors native Ctrl+B). \ isn't
+    // a reserved Chrome combo nor a default macOS/Windows system shortcut, so the page can intercept it. On Mac this shares
+    // the Mod family's plain-Ctrl modifier, but this check runs first and only matches the Backslash key, so it never
+    // collides with the Mod letters/brackets. Match e.code OR e.key so it fires on any keyboard layout.
+    const sidebarMod = e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey;
     if (sidebarMod && (e.code === 'Backslash' || e.key === '\\')) {
       e.preventDefault(); e.stopPropagation(); toggleSidebar(); return;
     }
