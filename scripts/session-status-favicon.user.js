@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Claude Code Web — Session Status Favicon + Title
 // @namespace    bruno.uptide
-// @version      2.7
+// @version      2.8
 // @description  Favicon = session status (green=running, teal=open PR, yellow=awaiting input, blue=ready, purple=merged), recoloring Claude's real icon. Tab title = session name.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
@@ -19,9 +19,7 @@
 
   const onSessionPage = () => /\/code\/session/.test(location.pathname);
 
-  // ============================================================
-  // 1) STATUS ON THE FAVICON
-  // ============================================================
+  // === 1) STATUS ON THE FAVICON ===
   const COLORS = { running: '#22c55e', awaiting: '#f5b301', ready: '#4a9eff', merged: '#b796ff', open: '#2dd4bf' }; // null = keep the original coral
   const KEY = { 'Running': 'running', 'Awaiting input': 'awaiting', 'Ready': 'ready' };
 
@@ -42,10 +40,8 @@
     return s ? s.getAttribute('aria-label') : null;
   }
 
-  // Session with a PR (no live [role="status"] on the row) — the state comes from a separate badge
-  // [role="img"] whose aria-label is "#21, #4 · Merged" (merged) or "#861 · Open" (open).
-  // Since there's no status, we match only by the selected row (data-selected).
-  // Returns 'merged' | 'open' | null (merged wins — in practice they don't coexist).
+  // Session with a PR has no live [role="status"]; state comes from a [role="img"] badge ("… · Merged" / "… · Open"), matched on the selected row.
+  // Returns 'merged' | 'open' | null (merged wins). See CLAUDE.md.
   function currentPR() {
     const row = document.querySelector('[data-row][data-selected]');
     if (!row) return null;
@@ -55,9 +51,8 @@
     return null;
   }
 
-  // recolors Claude's real icon. Loads claude.ai's own favicon.ico
-  // (same origin => the canvas doesn't get "tainted"), draws it on a canvas and uses source-in
-  // to swap the color while keeping the shape. Each color is generated once and cached.
+  // recolors Claude's real icon: loads claude.ai's favicon.ico (same origin, so the canvas isn't tainted), draws it and
+  // uses source-in to swap the color while keeping the shape. Cached per color. See CLAUDE.md.
   const cache = {};
   function tint(color) {
     return new Promise(res => {
@@ -107,12 +102,10 @@
     setFavicon(cache[k]);
   }
 
-  // ============================================================
-  // 2) SESSION NAME IN THE TITLE
-  // ============================================================
-  // The app's native title is "Claude Code". Here we swap it for the session name
-  // (the editable button at the top). React doesn't keep reverting it, so no war:
-  // we only re-apply when the name changes or when the app resets the title (e.g. navigation).
+  // === 2) SESSION NAME IN THE TITLE ===
+
+  // The native title is "Claude Code"; we swap it for the session name (the editable button). No war with React:
+  // we only re-apply when the name changes or the app resets the title. See CLAUDE.md.
   function sessionName() {
     const b = document.querySelector('button.cursor-text');
     const n = b && b.textContent.trim();
@@ -132,15 +125,12 @@
 
   function applyAll() { applyFavicon(); applyTitle(); }
 
-  // ============================================================
-  // triggers: scoped observers + 1s safety net + SPA navigation
-  // ============================================================
+  // === triggers: scoped observers + 1s safety net + SPA navigation ===
   let pend = false;
   const schedule = () => { if (pend) return; pend = true; setTimeout(() => { pend = false; applyAll(); }, 120); };
   const mo = new MutationObserver(schedule);
-  // At document-start the sidebar aside and the editable header don't exist yet (React mounts them later), so a single
-  // observe() in start() caught nothing and only the 1s poll acted. We bind idempotently and retry on the interval until
-  // each node appears. (The header becomes an <input> on rename; re-binding after rename is handled by the poll/title observer.)
+  // At document-start the sidebar/header/title aren't mounted yet (React adds them later), so we bind idempotently and
+  // retry on the 1s interval until each node appears. See CLAUDE.md.
   const bound = { aside: false, hdr: false, title: false };
   function bindObservers() {
     if (!bound.aside) { const a = document.querySelector('aside.dframe-sidebar'); if (a) { mo.observe(a, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-label', 'data-selected'] }); bound.aside = true; } }

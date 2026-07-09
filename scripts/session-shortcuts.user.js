@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Claude Code Web — Shortcuts
 // @namespace    bruno.uptide
-// @version      2.3
+// @version      2.4
 // @description  Keyboard shortcuts for Claude Code Web. The modifier is Ctrl on Mac and Alt on Windows/Linux (each is the one the browser leaves free — Mac Chrome uses Cmd, Windows Chrome uses Ctrl). Mod+[ / Mod+] move between sessions (up/down the sidebar list, even when collapsed), Mod+S toggles the Session Notepad, Mod+R renames the open session (selects the leading status token — the text inside [..] brackets, or a leading status emoji — ready to retype), Mod+C toggles plan usage, Mod+D toggles the Diff, Mod+B toggles Background tasks and Mod+A toggles Artifacts (in the ⋮ Session actions menu). All eight work on both platforms. Separately, Ctrl+\ toggles the native sidebar on every platform. Note: on Mac, Ctrl+A / Ctrl+B / Ctrl+D shadow the system text-editing keys (line start / back one char / delete forward).
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
@@ -20,11 +20,8 @@
   if (window.ccShortcutsLoaded) return;
   window.ccShortcutsLoaded = true;
 
-  // Modifier per platform: Ctrl on Mac (the browser owns Cmd, so plain Ctrl is free), Alt on Windows/Linux (the browser
-  // owns Ctrl there — Ctrl+Shift+letter collides with reserved combos a page can't override: reload, DevTools, bookmarks
-  // bar, tab search — while Alt+key is free). Can't use Alt on Mac: Option(Alt)+letter types special chars (é, ø).
-  // Caveat: on Mac, Ctrl+A / Ctrl+B / Ctrl+D shadow the macOS text-editing bindings (line start / back one char / delete
-  // forward); the handler has no focus guard (rename/switch must work from anywhere), so that trade lands even while typing. See CLAUDE.md.
+  // Modifier per platform: Ctrl on Mac (browser owns Cmd), Alt on Win/Linux (browser owns Ctrl). Not Alt on Mac: Option+letter types é/ø.
+  // Caveat: on Mac Ctrl+A/B/D shadow the system text-editing keys, and there's no focus guard. See CLAUDE.md.
   const isMac = /Mac/i.test(navigator.platform || navigator.userAgent || '');
 
   // Sessions in the sidebar = div[data-row] that contains a button[data-row-main-button] (menu items don't). DOM order = visual order.
@@ -56,10 +53,8 @@
   }
   const isEmoji = g => /\p{Extended_Pictographic}/u.test(g);
 
-  // Where to place the selection when the rename input opens, so one keystroke swaps the leading "status" token:
-  //  - "[TAG] Rest" -> selects TAG (inside the brackets, without [ ])
-  //  - "🟣 Rest"    -> selects the leading status emoji
-  //  - otherwise    -> null (keep the full selection the rename opened with)
+  // Selection placement when the rename input opens, so one keystroke swaps the leading status token:
+  // "[TAG] Rest" -> TAG; "🟣 Rest" -> the emoji; otherwise null (keep the full selection). See CLAUDE.md.
   function statusRange(v) {
     if (v[0] === '[') { const end = v.indexOf(']'); return end !== -1 ? [1, end] : null; }
     const g = firstGrapheme(v);
@@ -132,14 +127,10 @@
     setTimeout(step, isOpen() ? 0 : 40);
   }
 
-  // Require the platform modifier and no others. On Win/Linux we require !ctrl too, because AltGr (the right Alt on
-  // international layouts) reports as Ctrl+Alt — without that guard AltGr+letter would fire a shortcut mid-typing.
-  // Use e.code (physical key), not e.key: with Alt/Shift the printed char changes but the code doesn't. Capture phase to act first.
+  // Require the platform modifier and no others (Win/Linux also needs !ctrl: AltGr reports as Ctrl+Alt, would fire mid-typing).
+  // Use e.code (physical key), not e.key. Capture phase to act first. See CLAUDE.md.
   document.addEventListener('keydown', e => {
-    // Sidebar toggle: Ctrl+\ on every platform (Bruno's muscle memory; on Win/Linux it also mirrors native Ctrl+B). \ isn't
-    // a reserved Chrome combo nor a default macOS/Windows system shortcut, so the page can intercept it. On Mac this shares
-    // the Mod family's plain-Ctrl modifier, but this check runs first and only matches the Backslash key, so it never
-    // collides with the Mod letters/brackets. Match e.code OR e.key so it fires on any keyboard layout.
+    // Sidebar toggle: Ctrl+\ everywhere. Runs before the Mod gate; matches only Backslash, so no clash with Mod keys. Details in CLAUDE.md.
     const sidebarMod = e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey;
     if (sidebarMod && (e.code === 'Backslash' || e.key === '\\')) {
       e.preventDefault(); e.stopPropagation(); toggleSidebar(); return;
