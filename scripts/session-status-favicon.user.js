@@ -20,7 +20,9 @@
   const onSessionPage = () => /\/code\/session/.test(location.pathname);
 
   // === 1) STATUS ON THE FAVICON ===
+  // merged '#b796ff' = Claude's native purple; open teal '#2dd4bf' chosen (not the app's green) so it doesn't clash with running green.
   const COLORS = { running: '#22c55e', awaiting: '#f5b301', ready: '#4a9eff', merged: '#b796ff', open: '#2dd4bf' }; // null = keep the original coral
+  // Live status = [role="status"] aria-label inside the open row: 'Running' / 'Awaiting input' / 'Ready'.
   const KEY = { 'Running': 'running', 'Awaiting input': 'awaiting', 'Ready': 'ready' };
 
   const statusEls = () =>
@@ -40,8 +42,8 @@
     return s ? s.getAttribute('aria-label') : null;
   }
 
-  // Session with a PR has no live [role="status"]; state comes from a [role="img"] badge ("… · Merged" / "… · Open"), matched on the selected row.
-  // Returns 'merged' | 'open' | null (merged wins). See CLAUDE.md.
+  // PR session has no live [role="status"]; state from a [role="img"] badge aria-label ("#21, #4 · Merged" / "#861 · Open") on the selected row.
+  // Gotcha: other [role="img"] on the row are avatars (e.g. "Bruno Picinini"). Returns 'merged' | 'open' | null (merged wins).
   function currentPR() {
     const row = document.querySelector('[data-row][data-selected]');
     if (!row) return null;
@@ -52,7 +54,7 @@
   }
 
   // recolors Claude's real icon: loads claude.ai's favicon.ico (same origin, so the canvas isn't tainted), draws it and
-  // uses source-in to swap the color while keeping the shape. Cached per color. See CLAUDE.md.
+  // uses source-in to swap the color while keeping the shape. Cached per color.
   const cache = {};
   function tint(color) {
     return new Promise(res => {
@@ -89,7 +91,7 @@
     } else {
       const lbl = currentLabel();
       if (lbl) k = KEY[norm(lbl)] || 'default'; // norm: the aria-label may carry spaces/zero-width chars and break the lookup
-      else { const pr = currentPR(); if (pr) k = pr; // no status on the row + PR badge => purple (merged) / teal (open)
+      else { const pr = currentPR(); if (pr) k = pr; // priority: live status > PR. No status on the row + PR badge => purple (merged) / teal (open)
              else { if (lastKey) return; k = 'default'; } } // session still loading: keep the last one
     }
     if (k === lastKey) return;
@@ -105,7 +107,7 @@
   // === 2) SESSION NAME IN THE TITLE ===
 
   // The native title is "Claude Code"; we swap it for the session name (the editable button). No war with React:
-  // we only re-apply when the name changes or the app resets the title. See CLAUDE.md.
+  // we only re-apply when the name changes or the app resets the title.
   function sessionName() {
     const b = document.querySelector('button.cursor-text');
     const n = b && b.textContent.trim();
@@ -130,7 +132,7 @@
   const schedule = () => { if (pend) return; pend = true; setTimeout(() => { pend = false; applyAll(); }, 120); };
   const mo = new MutationObserver(schedule);
   // At document-start the sidebar/header/title aren't mounted yet (React adds them later), so we bind idempotently and
-  // retry on the 1s interval until each node appears. See CLAUDE.md.
+  // retry on the 1s interval until each node appears.
   const bound = { aside: false, hdr: false, title: false };
   function bindObservers() {
     if (!bound.aside) { const a = document.querySelector('aside.dframe-sidebar'); if (a) { mo.observe(a, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-label', 'data-selected'] }); bound.aside = true; } }

@@ -14,20 +14,20 @@
 // @updateURL    https://raw.githubusercontent.com/brunompicinini/cc-web-powerpack/main/scripts/session-shortcuts.user.js
 // ==/UserScript==
 
-// Claude Code Web DOM facts and the gotchas of each function are documented in the repo's CLAUDE.md.
+// Claude Code Web DOM facts (selectors, aria-labels, roles) and per-function gotchas are documented inline at each function below.
 (function ccShortcuts() {
   'use strict';
   if (window.ccShortcutsLoaded) return;
   window.ccShortcutsLoaded = true;
 
   // Modifier per platform: Ctrl on Mac (browser owns Cmd), Alt on Win/Linux (browser owns Ctrl). Not Alt on Mac: Option+letter types é/ø.
-  // Caveat: on Mac Ctrl+A/B/D shadow the system text-editing keys, and there's no focus guard. See CLAUDE.md.
+  // Caveat: on Mac Ctrl+A/B/D/V shadow the system text-editing keys (line start / back char / delete forward / page down); no focus guard. Accepted.
   const isMac = /Mac/i.test(navigator.platform || navigator.userAgent || '');
 
   // Sessions in the sidebar = div[data-row] that contains a button[data-row-main-button] (menu items don't). DOM order = visual order.
   const sessionRows = () =>
     [...document.querySelectorAll('div[data-row]')].filter(r => r.querySelector('button[data-row-main-button]'));
-  // Open session = row with [data-selected]; on home none has it -> -1.
+  // Open session = the one row with [data-selected] (value "focused"/"open"), follows the route; on home none has it -> -1.
   const currentIdx = rows => rows.findIndex(r => r.hasAttribute('data-selected'));
 
   // dir +1 (next/down) | -1 (previous/up). Clamps at the ends. Clicking the main-button navigates (works when collapsed).
@@ -54,7 +54,7 @@
   const isEmoji = g => /\p{Extended_Pictographic}/u.test(g);
 
   // Selection placement when the rename input opens, so one keystroke swaps the leading status token:
-  // "[TAG] Rest" -> TAG; "🟣 Rest" -> the emoji; otherwise null (keep the full selection). See CLAUDE.md.
+  // "[TAG] Rest" -> TAG; "🟣 Rest" -> the emoji (gated on a trailing space so a normal first word/letter doesn't misfire); else null (keep full selection).
   function statusRange(v) {
     if (v[0] === '[') { const end = v.indexOf(']'); return end !== -1 ? [1, end] : null; }
     const g = firstGrapheme(v);
@@ -105,12 +105,13 @@
     if (btn) btn.click();
   }
 
-  // Toggle a panel that lives in the ⋮ "Session actions" menu (Artifacts, Background tasks): open the menu, click the
-  // visible item by text, then close the menu (re-click the trigger). aria-expanded on the trigger = the real menu state.
+  // Artifacts/Background tasks are items of the ⋮ "Session actions" menu (jul/2026: were action-bar buttons, now role="menuitemcheckbox").
+  // Open menu -> click the visible item -> close. Radix forceMounts a hidden [role=menu], so use the trigger's aria-expanded, not the menu's existence.
   function togglePanel(labelRe) {
     const trigger = document.querySelector('button[aria-label="Session actions"]');
     if (!trigger) return;
     const isOpen = () => trigger.getAttribute('aria-expanded') === 'true';
+    // The item is only mounted while the menu is open (unmounts on close) -> poll after opening; offsetParent picks the visible one, not a hidden residual.
     const findItem = () => [...document.querySelectorAll('[role="menuitemcheckbox"]')]
       .find(e => e.offsetParent && labelRe.test((e.textContent || '').trim()));
     if (!isOpen()) trigger.click();
@@ -119,7 +120,7 @@
       const it = findItem();
       if (it) {
         it.click();
-        setTimeout(() => { if (isOpen()) trigger.click(); }, 80);   // Radix menuitemcheckbox doesn't close the menu by itself
+        setTimeout(() => { if (isOpen()) trigger.click(); }, 80);   // menuitemcheckbox doesn't self-close; Radix ignores synthetic Escape/click-outside, so re-clicking the trigger is the only reliable close
         return;
       }
       if (tries-- > 0) setTimeout(step, 25);
@@ -127,8 +128,8 @@
     setTimeout(step, isOpen() ? 0 : 40);
   }
 
-  // Quote-to-comment: page text selection -> prompt box + "\n☝️ ", caret ready to reply. No-op if nothing selected.
-  // TipTap/ProseMirror editor only ingests text via a synthetic paste event. Read selection before focus. Details in CLAUDE.md.
+  // Quote-to-comment: page text selection -> prompt box + "\n☝️ ", caret ready to reply. No-op if none; read selection BEFORE focus (focus clears it).
+  // TipTap/ProseMirror ignores textContent/innerHTML writes; only ingests text via a synthetic paste (ClipboardEvent + DataTransfer text/plain).
   function quoteToPrompt() {
     const quote = (window.getSelection() ? window.getSelection().toString() : '').trim();
     if (!quote) return;
@@ -140,14 +141,16 @@
     const r = document.createRange(); r.selectNodeContents(pm); r.collapse(false); sel.addRange(r);   // caret to end
     const prefix = pm.textContent.trim() ? '\n' : '';                                                 // don't glue onto an existing draft
     const dt = new DataTransfer();
+    // ProseMirror turns each \n into a new paragraph (tight, no blank line; \n\n would add one). ☝️ = U+261D + U+FE0F - keep the FE0F or it renders as a black text glyph.
     dt.setData('text/plain', prefix + quote + '\n☝️ ');
     pm.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
   }
 
   // Require the platform modifier and no others (Win/Linux also needs !ctrl: AltGr reports as Ctrl+Alt, would fire mid-typing).
-  // Use e.code (physical key), not e.key. Capture phase to act first. See CLAUDE.md.
+  // Use e.code (physical key), not e.key (Shift turns [ ] into { }). Capture phase to act first.
   document.addEventListener('keydown', e => {
-    // Sidebar toggle: Ctrl+\ everywhere. Runs before the Mod gate; matches only Backslash, so no clash with Mod keys. Details in CLAUDE.md.
+    // Sidebar toggle: Ctrl+\ everywhere. Runs before the Mod gate; matches only Backslash, so no clash with Mod keys.
+    // !alt keeps AltGr (Ctrl+Alt on intl layouts) from firing while typing \; e.key === '\\' fallback = layout-independent (e.g. ABNT2).
     const sidebarMod = e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey;
     if (sidebarMod && (e.code === 'Backslash' || e.key === '\\')) {
       e.preventDefault(); e.stopPropagation(); toggleSidebar(); return;

@@ -14,7 +14,7 @@
 // @updateURL    https://raw.githubusercontent.com/brunompicinini/cc-web-powerpack/main/scripts/session-notepad.user.js
 // ==/UserScript==
 
-// Claude Code Web DOM facts and the gotchas of each part are documented in the repo's CLAUDE.md.
+// Claude Code Web DOM facts and gotchas are documented inline at each part below.
 (function ccNotesUserscript() {
   'use strict';
   if (window.ccNotesLoaded) return;
@@ -27,11 +27,11 @@
   const MUTED = 'rgba(255,255,255,0.55)', BRIGHT = 'hsl(60 14% 97%)';
   const ACCENT = '#0099ff'; // blue of the active button + links (same as Claude Code Web)
   const MINW = 300, DEFW = 750; // default width 750px; no fixed cap (only the window limits it)
-  // Floating panel like the native ones (Background tasks etc.): elevated background, 8px corners, EDGE inset from the edges.
-  // RESERVE=8 (measured) keeps the action bar 12px from the panel, like the native one. Details in CLAUDE.md.
+  // Floating panel like the native ones (Background tasks etc.): elevated bg = surface-primary-elevated token rgb(38,38,38) (≠ body rgb(31,31,30)), 8px corners, EDGE inset.
+  // RESERVE=8 (measured) keeps the action bar 12px from the panel, like the native one.
   const PANEL_BG = 'rgb(38,38,38)', RADIUS = 8, EDGE = 9, RESERVE = 8;
   // Slide: the SAME framer-motion spring as the native panels, measured frame by frame and reproduced with a linear() easing
-  // (~300ms; enter and exit identical — the native one is symmetric). Measured points and the why in CLAUDE.md.
+  // (~300ms; enter and exit identical, symmetric like the native one). Measured points = the linear() values below.
   const SPRING_MS = 300;
   const SPRING = 'linear(0, 0.074 5.4%, 0.192 10.7%, 0.359 16.4%, 0.471 19.1%, 0.576 21.8%, 0.665 24.8%, 0.741 27.5%, 0.79 30.2%, 0.857 35.9%, 0.896 41.6%, 0.925 47%, 0.943 52.7%, 0.965 61.1%, 0.976 66.4%, 0.986 74.8%, 0.994 86.2%, 1 100%)';
   const SPRING_TR = 'transform ' + SPRING_MS + 'ms ' + SPRING;
@@ -81,8 +81,8 @@
   // chat name = Claude's editable header (button.cursor-text), includes the [id] prefix. Same source the favicon script uses.
   const sessionName = () => { const b = document.querySelector('button.cursor-text'); return b ? (b.textContent || '').trim() : ''; };
 
-  // Pushes main to open room for the panel (style.right). Tries the old id #dframe-main and falls back to <main.dframe-content>.
-  // Reserves w + RESERVE (keeps the bar 12px from the panel — see the constants / CLAUDE.md).
+  // Pushes main to open room via style.right (main is position:absolute;left:0;right:0 → setting right shrinks it).
+  // Tries old id #dframe-main, falls back to <main.dframe-content> (app swapped id→class jul/2026). Reserves w+RESERVE (bar 12px from panel).
   function squeeze(on, w) { const m = document.getElementById('dframe-main') || document.querySelector('main.dframe-content'); if (m) m.style.right = on ? (w + RESERVE + 'px') : ''; }
 
   function buildDrawer() {
@@ -166,7 +166,7 @@
     // saves under currentId (the session loaded in the editor), NOT a fresh sid(): on a switch the URL changes first and it'd save to the wrong session.
     editor.addEventListener('input', () => { const id = currentId; if (!id) return; const val = getText(); clearTimeout(saveT); saveT = setTimeout(() => save(id, val), 300); });
     // blur: saves immediately and re-linkifies. Only re-renders on a "real" blur (focus on the SAME page, document.hasFocus()===true);
-    // if the doc lost focus (tab switch), does NOT rewrite the innerHTML -> the caret survives on return. Details in CLAUDE.md.
+    // if the doc lost focus (tab switch), does NOT rewrite the innerHTML -> the caret survives on return.
     editor.addEventListener('blur', () => { const id = currentId; const val = getText(); if (id) { clearTimeout(saveT); save(id, val); } if (val !== lastRendered && document.hasFocus()) setText(val); });
     // a click on a link ALWAYS opens it (the editor is focused by default). To edit a link's text, place the caret outside it.
     editor.addEventListener('mousedown', e => {
