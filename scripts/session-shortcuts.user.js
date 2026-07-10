@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Claude Code Web — Shortcuts
 // @namespace    bruno.uptide
-// @version      2.4
-// @description  Keyboard shortcuts for Claude Code Web. The modifier is Ctrl on Mac and Alt on Windows/Linux (each is the one the browser leaves free — Mac Chrome uses Cmd, Windows Chrome uses Ctrl). Mod+[ / Mod+] move between sessions (up/down the sidebar list, even when collapsed), Mod+S toggles the Session Notepad, Mod+R renames the open session (selects the leading status token — the text inside [..] brackets, or a leading status emoji — ready to retype), Mod+C toggles plan usage, Mod+D toggles the Diff, Mod+B toggles Background tasks and Mod+A toggles Artifacts (in the ⋮ Session actions menu). All eight work on both platforms. Separately, Ctrl+\ toggles the native sidebar on every platform. Note: on Mac, Ctrl+A / Ctrl+B / Ctrl+D shadow the system text-editing keys (line start / back one char / delete forward).
+// @version      2.5
+// @description  Keyboard shortcuts for Claude Code Web. The modifier is Ctrl on Mac and Alt on Windows/Linux (each is the one the browser leaves free — Mac Chrome uses Cmd, Windows Chrome uses Ctrl). Mod+[ / Mod+] move between sessions (up/down the sidebar list, even when collapsed), Mod+S toggles the Session Notepad, Mod+R renames the open session (selects the leading status token — the text inside [..] brackets, or a leading status emoji — ready to retype), Mod+C toggles plan usage, Mod+D toggles the Diff, Mod+B toggles Background tasks, Mod+A toggles Artifacts (in the ⋮ Session actions menu), and Mod+V quotes the current text selection into the prompt box (drops to a new ☝️ line with the caret ready to reply). All nine work on both platforms. Separately, Ctrl+\ toggles the native sidebar on every platform. Note: on Mac, Ctrl+A / Ctrl+B / Ctrl+D / Ctrl+V shadow the system text-editing keys (line start / back one char / delete forward / page down).
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
 // @run-at       document-start
@@ -127,6 +127,25 @@
     setTimeout(step, isOpen() ? 0 : 40);
   }
 
+  // Quote-to-comment: drop the current page text selection into the prompt box, break to a new line, add a ☝️ pointing
+  // at it, and leave the caret there ready to reply. The prompt editor is TipTap/ProseMirror, which only ingests text via a
+  // synthetic paste event (setting textContent is ignored); "\n" -> a new paragraph (tight, no blank line). No-op with no
+  // selection. Read the selection BEFORE focusing the editor (focusing clears it). See CLAUDE.md.
+  function quoteToPrompt() {
+    const quote = (window.getSelection() ? window.getSelection().toString() : '').trim();
+    if (!quote) return;
+    const pm = document.querySelector('.epitaxy-prompt-input .ProseMirror') || document.querySelector('.tiptap.ProseMirror');
+    if (!pm) return;
+    pm.focus();
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    const r = document.createRange(); r.selectNodeContents(pm); r.collapse(false); sel.addRange(r);   // caret to end
+    const prefix = pm.textContent.trim() ? '\n' : '';                                                 // don't glue onto an existing draft
+    const dt = new DataTransfer();
+    dt.setData('text/plain', prefix + quote + '\n☝️ ');
+    pm.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+  }
+
   // Require the platform modifier and no others (Win/Linux also needs !ctrl: AltGr reports as Ctrl+Alt, would fire mid-typing).
   // Use e.code (physical key), not e.key. Capture phase to act first. See CLAUDE.md.
   document.addEventListener('keydown', e => {
@@ -150,6 +169,7 @@
       case 'KeyD': stop(); diff(); break;                              // toggle the Diff view
       case 'KeyB': stop(); togglePanel(/^Background tasks$/i); break;  // toggle Background tasks
       case 'KeyA': stop(); togglePanel(/^Artifacts$/i); break;         // toggle Artifacts
+      case 'KeyV': stop(); quoteToPrompt(); break;                     // quote the selection into the prompt box + ☝️
     }
   }, true);
 })();
