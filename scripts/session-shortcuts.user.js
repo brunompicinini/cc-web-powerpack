@@ -127,10 +127,8 @@
     setTimeout(step, isOpen() ? 0 : 40);
   }
 
-  // Quote-to-comment: drop the current page text selection into the prompt box, break to a new line, add a ☝️ pointing
-  // at it, and leave the caret there ready to reply. The prompt editor is TipTap/ProseMirror, which only ingests text via a
-  // synthetic paste event (setting textContent is ignored); "\n" -> a new paragraph (tight, no blank line). No-op with no
-  // selection. Read the selection BEFORE focusing the editor (focusing clears it). See CLAUDE.md.
+  // Quote-to-comment: page text selection -> prompt box + "\n☝️ ", caret ready to reply. No-op if nothing selected.
+  // TipTap/ProseMirror editor only ingests text via a synthetic paste event. Read selection before focus. Details in CLAUDE.md.
   function quoteToPrompt() {
     const quote = (window.getSelection() ? window.getSelection().toString() : '').trim();
     if (!quote) return;

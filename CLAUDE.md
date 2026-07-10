@@ -14,6 +14,7 @@ Public repo: `brunompicinini/cc-web-powerpack`, default branch `main`.
 - `CLAUDE.md` — this file.
 
 ## Conventions
+- **Comentários curtos, estilo Caveman:** direto, simples, **máximo 2 linhas** por comentário. Nada de parágrafo dentro do código. Detalhes/porquês longos vão pro CLAUDE.md, não no `.user.js`.
 - Every script has a `// ==UserScript== ... ==/UserScript==` header.
 - `@match https://claude.ai/code*`, `@run-at document-start`. `@grant`: favicon and shortcuts use `none`; **the notepad uses `GM_openInTab`** (to reliably open a link in a background tab — see below). With `@grant` != none the script runs in the Tampermonkey sandbox (DOM/`history`/`location`/`localStorage` are still real; it just can't see the page's JS vars).
 - **Auto-update:** `@downloadURL` and `@updateURL` point at the raw URL on `main`:
