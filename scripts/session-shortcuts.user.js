@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Claude Code Web — Shortcuts
 // @namespace    bruno.uptide
-// @version      2.5
+// @version      2.6
 // @description  Keyboard shortcuts for Claude Code Web. The modifier is Ctrl on Mac and Alt on Windows/Linux (each is the one the browser leaves free — Mac Chrome uses Cmd, Windows Chrome uses Ctrl). Mod+[ / Mod+] move between sessions (up/down the sidebar list, even when collapsed), Mod+S toggles the Session Notepad, Mod+R renames the open session (selects the leading status token — the text inside [..] brackets, or a leading status emoji — ready to retype), Mod+C toggles plan usage, Mod+D toggles the Diff, Mod+B toggles Background tasks, Mod+A toggles Artifacts (in the ⋮ Session actions menu), and Mod+V quotes the current text selection into the prompt box (drops to a new ☝️ line with the caret ready to reply). All nine work on both platforms. Separately, Ctrl+\ toggles the native sidebar on every platform. Note: on Mac, Ctrl+A / Ctrl+B / Ctrl+D / Ctrl+V shadow the system text-editing keys (line start / back one char / delete forward / page down).
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
@@ -24,9 +24,9 @@
   // Caveat: on Mac Ctrl+A/B/D/V shadow the system text-editing keys (line start / back char / delete forward / page down); no focus guard. Accepted.
   const isMac = /Mac/i.test(navigator.platform || navigator.userAgent || '');
 
-  // Sessions in the sidebar = div[data-row] that contains a button[data-row-main-button] (menu items don't). DOM order = visual order.
+  // Sessions in the sidebar = div[data-row] whose main button is an <a> (menu items New/Artifacts/… are <button>). DOM order = visual order.
   const sessionRows = () =>
-    [...document.querySelectorAll('div[data-row]')].filter(r => r.querySelector('button[data-row-main-button]'));
+    [...document.querySelectorAll('div[data-row]')].filter(r => r.querySelector('a[data-row-main-button]'));
   // Open session = the one row with [data-selected] (value "focused"/"open"), follows the route; on home none has it -> -1.
   const currentIdx = rows => rows.findIndex(r => r.hasAttribute('data-selected'));
 
@@ -38,7 +38,7 @@
     let t;
     if (cur === -1) t = dir > 0 ? 0 : rows.length - 1;       // home: ] opens the first, [ opens the last
     else { t = cur + dir; if (t < 0 || t >= rows.length) return; }
-    const btn = rows[t] && rows[t].querySelector('button[data-row-main-button]');
+    const btn = rows[t] && rows[t].querySelector('a[data-row-main-button]');
     if (btn) btn.click();
   }
 
