@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Claude Code Web — Session Status Favicon + Title
 // @namespace    bruno.uptide
-// @version      2.8
-// @description  Favicon = session status (green=running, teal=open PR, yellow=awaiting input, blue=ready, purple=merged), recoloring Claude's real icon. Tab title = session name.
+// @version      2.9
+// @description  Favicon = session status (green=running, teal=open/draft PR, yellow=awaiting input/answer, blue=unread response, purple=merged), recoloring Claude's real icon. Tab title = session name.
 // @author       Bruno Picinini
 // @match        https://claude.ai/code*
 // @run-at       document-start
@@ -22,34 +22,37 @@
   // === 1) STATUS ON THE FAVICON ===
   // merged '#b796ff' = Claude's native purple; open teal '#2dd4bf' chosen (not the app's green) so it doesn't clash with running green.
   const COLORS = { running: '#22c55e', awaiting: '#f5b301', ready: '#4a9eff', merged: '#b796ff', open: '#2dd4bf' }; // null = keep the original coral
-  // Live status = [role="status"] aria-label inside the open row: 'Running' / 'Awaiting input' / 'Ready'.
-  const KEY = { 'Running': 'running', 'Awaiting input': 'awaiting', 'Ready': 'ready' };
+  // State aria-label (app's own strings). 'Running'/'Awaiting …'/'Unread response' come as [role="status"], 'Idle' as [role="img"].
+  const KEY = { 'Running': 'running', 'Awaiting input': 'awaiting', 'Awaiting answer': 'awaiting', 'Unread response': 'ready', 'Idle': 'default' };
 
-  const statusEls = () =>
-    [...document.querySelectorAll('[data-row] button')].filter(b => b.querySelector('[role="status"]'));
+  // Sidebar row = div[data-row]; the clickable part is an <a data-row-main-button href="/code/session_…"> (was a <button>).
+  const sessionRows = () => [...document.querySelectorAll('[data-row]')].filter(r => r.querySelector('a[data-row-main-button]'));
   const norm = s => (s || '').replace(/[​-‍﻿]/g, '').replace(/\s+/g, ' ').trim();
-  function currentLabel() {
-    const btns = statusEls();
-    // 1) open session (marked in the sidebar)
-    let row = btns.find(b => b.closest('[data-row]')?.hasAttribute('data-selected'));
-    // 2) fallback: match by the header name (e.g. after reload, when the row isn't marked)
+  function currentRow() {
+    const rows = sessionRows();
+    // 1) by href (exact). 2) fallback: header name (right after a reload the row may not be rendered/marked yet).
+    let row = rows.find(r => r.querySelector('a[data-row-main-button]').getAttribute('href') === location.pathname);
     if (!row) {
-      const name = (document.querySelector('button.cursor-text') || {}).textContent;
-      if (name) { const n = norm(name); row = btns.find(b => norm(b.textContent) === n); }
+      const n = norm((document.querySelector('button.cursor-text') || {}).textContent);
+      if (n) row = rows.find(r => norm(r.textContent) === n);
     }
-    if (!row) return null; // no open session / not in the list => no status
-    const s = row.querySelector('[role="status"]');
-    return s ? s.getAttribute('aria-label') : null;
+    return row || null;
+  }
+  // aria-label may carry spaces/zero-width chars -> norm before the lookup.
+  function currentState(row) {
+    for (const el of row.querySelectorAll('[role="status"],[role="img"]')) {
+      const k = KEY[norm(el.getAttribute('aria-label'))];
+      if (k) return k;
+    }
+    return null;
   }
 
-  // PR session has no live [role="status"]; state from a [role="img"] badge aria-label ("#21, #4 · Merged" / "#861 · Open") on the selected row.
-  // Gotcha: other [role="img"] on the row are avatars (e.g. "Bruno Picinini"). Returns 'merged' | 'open' | null (merged wins).
-  function currentPR() {
-    const row = document.querySelector('[data-row][data-selected]');
-    if (!row) return null;
+  // PR badge = [role="img"] aria-label "#43 · Open" / "#9, #47 · Draft" / "#21, #4 · Merged". The '·' keeps it apart from state labels.
+  // Returns 'merged' | 'open' | null (merged wins; draft counts as open).
+  function currentPR(row) {
     const labels = [...row.querySelectorAll('[role="img"]')].map(i => i.getAttribute('aria-label') || '');
-    if (labels.some(a => /\bMerged\b/i.test(a))) return 'merged';
-    if (labels.some(a => /\bOpen\b/i.test(a))) return 'open';
+    if (labels.some(a => /·[^·]*\bMerged\b/i.test(a))) return 'merged';
+    if (labels.some(a => /·[^·]*\b(Open|Draft)\b/i.test(a))) return 'open';
     return null;
   }
 
@@ -89,10 +92,11 @@
     if (!onSessionPage()) {
       k = 'default'; // home / list => Claude's original icon
     } else {
-      const lbl = currentLabel();
-      if (lbl) k = KEY[norm(lbl)] || 'default'; // norm: the aria-label may carry spaces/zero-width chars and break the lookup
-      else { const pr = currentPR(); if (pr) k = pr; // priority: live status > PR. No status on the row + PR badge => purple (merged) / teal (open)
-             else { if (lastKey) return; k = 'default'; } } // session still loading: keep the last one
+      const row = currentRow();
+      const st = row && currentState(row), pr = row && currentPR(row);
+      if (!st && !pr) { if (lastKey) return; k = 'default'; } // session still loading: keep the last one
+      // priority: live state > PR badge. 'Idle' carries no info -> let the PR color through.
+      else k = (st && st !== 'default') ? st : (pr || 'default');
     }
     if (k === lastKey) return;
     if (cache[k] === undefined) {
