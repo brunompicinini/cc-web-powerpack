@@ -1,4 +1,4 @@
-# CLAUDE.md — cc-web-powerpack
+# AGENTS.md — cc-web-powerpack
 
 Userscripts (Tampermonkey) that improve **Claude Code Web** (`claude.ai/code`).
 Public repo: `brunompicinini/cc-web-powerpack`, default branch `main`.
@@ -11,10 +11,10 @@ Public repo: `brunompicinini/cc-web-powerpack`, default branch `main`.
 ## Structure
 - `scripts/*.user.js` — one userscript per file (filename ends in `.user.js`).
 - `README.md` — installation (Tampermonkey + the Chrome 138+ "Allow User Scripts" toggle) and auto-update.
-- `CLAUDE.md` — this file.
+- `AGENTS.md` — this file.
 
 ## Conventions
-- **Comentários curtos, estilo Caveman:** direto, simples, **máximo 2 linhas** por comentário. O conhecimento (DOM facts, gotchas) mora em comentário curto **perto do código**, onde é olhado - **não** centralizado aqui no CLAUDE.md. Narrativa de versão e deduções longas não se anota (git guarda).
+- **Comentários curtos, estilo Caveman:** direto, simples, **máximo 2 linhas** por comentário. O conhecimento (DOM facts, gotchas) mora em comentário curto **perto do código**, onde é olhado - **não** centralizado aqui no AGENTS.md. Narrativa de versão e deduções longas não se anota (git guarda).
 - Every script has a `// ==UserScript== ... ==/UserScript==` header.
 - `@match https://claude.ai/code*`, `@run-at document-start`. `@grant`: favicon and shortcuts use `none`; **the notepad uses `GM_openInTab`** (to reliably open a link in a background tab — see below). With `@grant` != none the script runs in the Tampermonkey sandbox (DOM/`history`/`location`/`localStorage` are still real; it just can't see the page's JS vars).
 - **Auto-update:** `@downloadURL` and `@updateURL` point at the raw URL on `main`:

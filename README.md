@@ -62,7 +62,7 @@ Tampermonkey checks `@updateURL` periodically. When the `@version` in the repo i
 - One script per file in `scripts/`, always ending in `.user.js`.
 - Keep `@downloadURL` / `@updateURL` pointing at the raw URL of the `main` branch.
 - **Bump `@version`** on every published change — that's what triggers auto-update.
-- See [`CLAUDE.md`](CLAUDE.md) for conventions and Claude Code Web DOM details.
+- See [`AGENTS.md`](AGENTS.md) for conventions and Claude Code Web DOM details.
 
 ---
 
